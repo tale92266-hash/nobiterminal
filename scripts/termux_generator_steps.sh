@@ -101,9 +101,13 @@ patch_bootstraps() {
 
 	if [[ "$TERMUX_APP__USER_PATH" != "/data/data" ]]; then
 		replace_termux_user_path termux-packages-main "$TERMUX_APP__USER_PATH"
-
-		echo "TERMUX_APP__USER_PATH=$TERMUX_APP__USER_PATH" >> termux-packages-main/scripts/properties.sh
 	fi
+
+	# Always define TERMUX_APP__USER_PATH for the bootstrap (docker) build
+	# environment: the name-change-helper bootstrap patches reference it
+	# while `set -u` is active, and it is otherwise only set on the host
+	# side (build-termux.sh) when the default /data/data path is used.
+	echo "TERMUX_APP__USER_PATH=$TERMUX_APP__USER_PATH" >> termux-packages-main/scripts/properties.sh
 
     portable_sed_i -e "s|termux-package-builder|$TERMUX_GENERATOR_CONTAINER_NAME|g" termux-packages-main/scripts/run-docker.sh
 

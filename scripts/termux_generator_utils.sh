@@ -46,7 +46,9 @@ replace_termux_name() {
 }
 
 replace_termux_user_path() {
-    if [[ "$TERMUX_APP__USER_PATH" == "/data/data" ]]; then
+    # Default /data/data when unset (e.g. inside the bootstrap docker build
+    # where the variable is not exported and `set -u` is active).
+    if [[ "${TERMUX_APP__USER_PATH:-/data/data}" == "/data/data" ]]; then
         return
     fi
     local targetdir="$1"
