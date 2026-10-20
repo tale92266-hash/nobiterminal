@@ -1,0 +1,22 @@
+--- a/termux-app/app/src/main/res/values/strings.xml
++++ b/termux-app/app/src/main/res/values/strings.xml
+@@ -2,7 +2,7 @@
+ 
+ <!DOCTYPE resources [
+     <!ENTITY TERMUX_PACKAGE_NAME "com.termux">
+-    <!ENTITY TERMUX_APP_NAME "Termux">
++    <!ENTITY TERMUX_APP_NAME "NobiTerminal">
+     <!ENTITY TERMUX_API_APP_NAME "Termux:API">
+     <!ENTITY TERMUX_BOOT_APP_NAME "Termux:Boot">
+     <!ENTITY TERMUX_FLOAT_APP_NAME "Termux:Float">
+--- a/termux-app/app/build.gradle
++++ b/termux-app/app/build.gradle
+@@ -52,7 +52,7 @@
+         buildConfigField "String", "TERMUX_PACKAGE_VARIANT", "\"" + project.ext.packageVariant + "\"" // Used by TermuxApplication class
+ 
+         manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.termux"
+-        manifestPlaceholders.TERMUX_APP_NAME = "Termux"
++        manifestPlaceholders.TERMUX_APP_NAME = "NobiTerminal"
+         manifestPlaceholders.TERMUX_API_APP_NAME = "Termux:API"
+         manifestPlaceholders.TERMUX_BOOT_APP_NAME = "Termux:Boot"
+         manifestPlaceholders.TERMUX_FLOAT_APP_NAME = "Termux:Float"
