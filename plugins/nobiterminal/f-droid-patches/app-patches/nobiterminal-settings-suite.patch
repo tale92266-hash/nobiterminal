@@ -291,7 +291,7 @@ index 0000000..e045947
 +import java.util.regex.Matcher;
 +import java.util.regex.Pattern;
 +
-+import static com.termux.shared.termux.TermuxConstants.TERMUX_SERVICE;
++import com.termux.shared.termux.TermuxConstants.TERMUX_APP.TERMUX_SERVICE;
 +
 +/**
 + * Helpers for the NobiTerminal settings entries added by the
