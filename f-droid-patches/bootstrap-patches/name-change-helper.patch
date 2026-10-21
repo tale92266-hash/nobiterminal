@@ -11,20 +11,23 @@
  termux_step_create_debscripts() {
 --- a/packages/termux-tools/build.sh
 +++ b/packages/termux-tools/build.sh
-@@ -21,6 +21,16 @@ TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, gr
+@@ -21,6 +21,19 @@ TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, gr
  TERMUX_PKG_RECOMMENDS="ed, dos2unix, inetutils, net-tools, patch, unzip"
  
  termux_step_pre_configure() {
 +	. "$TERMUX_SCRIPTDIR/scripts/termux_generator_utils.sh"
 +   replace_termux_name "$TERMUX_PKG_SRCDIR" "$TERMUX_APP__PACKAGE_NAME"
 +   replace_termux_user_path "$TERMUX_PKG_SRCDIR" "${TERMUX_APP__USER_PATH:-/data/data}"
-+	echo "Welcome to $TERMUX_APP__PACKAGE_NAME!
-+This is a fork of \"F-Droid\" Termux!
-+Do not report issues with this build upstream!
-+========= Donate Here ===========
-+https://termux.dev/en/donate.html
-+https://opencollective.com/termux
-+=================================" > motds/motd
++	printf '%s\n' \
++		'  _   _  ____  ____  _____' \
++		' | \ | |/ __ \|  _ \|_   _|' \
++		' |  \| | |  | | |_) | | |' \
++		' | . ` | |  | |  _ <  | |' \
++		' | |\  | |__| | |_) |_| |_' \
++		' |_| \_|\____/|____/|_____|' \
++		'      T E R M I N A L' \
++		'   Welcome back, Sam.' \
++		'   Your terminal. Your rules.' > motds/motd
  	autoreconf -vfi
  }
  
