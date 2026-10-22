@@ -257,7 +257,7 @@ index 0000000..7971db9
 +}
 diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
 new file mode 100644
-index 0000000..e045947
+index 0000000..632a3dd
 --- /dev/null
 +++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
 @@ -0,0 +1,344 @@
@@ -445,14 +445,14 @@ index 0000000..e045947
 +    // region Extra keys bar
 +
 +    /** Canonical order used when composing the first extra keys row. */
-+    public static final String[] EXTRA_KEYS_ROW_1_ORDER = {"ESC", "TAB", "CTRL", "ALT", "|", "-", "/", "_"};
++    public static final String[] EXTRA_KEYS_ROW_1_ORDER = {"ESC", "DRAWER", "TAB", "CTRL", "ALT", "|", "-", "/", "_"};
 +
 +    /** Canonical order used when composing the second extra keys row. */
 +    public static final String[] EXTRA_KEYS_ROW_2_ORDER = {"HOME", "END", "PGUP", "PGDN", "LEFT", "DOWN", "UP", "RIGHT"};
 +
 +    /** All keys offered as toggles on the Extra Keys Bar settings screen. */
 +    public static final String[] ALL_EXTRA_KEYS = {
-+        "ESC", "TAB", "CTRL", "ALT", "|", "-", "/", "_",
++        "ESC", "DRAWER", "TAB", "CTRL", "ALT", "|", "-", "/", "_",
 +        "HOME", "END", "PGUP", "PGDN", "LEFT", "DOWN", "UP", "RIGHT"};
 +
 +    private static final Pattern EXTRA_KEYS_LINE_PATTERN = Pattern.compile("^\\s*extra-keys\\s*=(.*)$");
@@ -652,10 +652,10 @@ index 0000000..e83bce7
 +
 +</resources>
 diff --git a/termux-app/app/src/main/res/values/strings.xml b/termux-app/app/src/main/res/values/strings.xml
-index b529fe0..873fae3 100644
+index b529fe0..916a280 100644
 --- a/termux-app/app/src/main/res/values/strings.xml
 +++ b/termux-app/app/src/main/res/values/strings.xml
-@@ -235,4 +235,30 @@
+@@ -235,4 +235,31 @@
      <!-- Donate Preference -->
      <string name="donate_preference_title">Donate</string>
  
@@ -681,6 +681,7 @@ index b529fe0..873fae3 100644
 +    <string name="nobi_extra_keys_preference_summary">Choose which keys are shown above the keyboard</string>
 +    <string name="nobi_extra_keys_preset_title">Preset</string>
 +    <string name="nobi_extra_keys_keys_title">Keys</string>
++    <string name="nobi_key_drawer_title">Sidebar (☰)</string>
 +    <string name="nobi_extra_keys_screen_summary">Saved to ~/.termux/termux.properties. Your other settings in that file are kept as they are.</string>
 +
 +    <string name="nobi_settings_save_failed">Could not save the setting. Please try again.</string>
@@ -688,10 +689,10 @@ index b529fe0..873fae3 100644
  </resources>
 diff --git a/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml b/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
 new file mode 100644
-index 0000000..21294bb
+index 0000000..eb0e09e
 --- /dev/null
 +++ b/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,68 @@
 +<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 +
 +    <ListPreference
@@ -708,6 +709,9 @@ index 0000000..21294bb
 +        <CheckBoxPreference
 +            app:key="nobi_key_ESC"
 +            app:title="ESC"/>
++        <CheckBoxPreference
++            app:key="nobi_key_DRAWER"
++            app:title="@string/nobi_key_drawer_title"/>
 +        <CheckBoxPreference
 +            app:key="nobi_key_TAB"
 +            app:title="TAB"/>

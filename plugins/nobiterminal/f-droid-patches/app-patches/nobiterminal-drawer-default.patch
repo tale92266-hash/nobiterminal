@@ -1,0 +1,13 @@
+diff --git a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/settings/properties/TermuxPropertyConstants.java b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/settings/properties/TermuxPropertyConstants.java
+index dd935f3..6b1ee22 100644
+--- a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/settings/properties/TermuxPropertyConstants.java
++++ b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/settings/properties/TermuxPropertyConstants.java
+@@ -326,7 +326,7 @@ public final class TermuxPropertyConstants {
+     /** Defines the key for extra keys */
+     public static final String KEY_EXTRA_KEYS =  "extra-keys"; // Default: "extra-keys"
+     //public static final String DEFAULT_IVALUE_EXTRA_KEYS = "[[ESC, TAB, CTRL, ALT, {key: '-', popup: '|'}, DOWN, UP]]"; // Single row
+-    public static final String DEFAULT_IVALUE_EXTRA_KEYS = "[['ESC','/',{key: '-', popup: '|'},'HOME','UP','END','PGUP'], ['TAB','CTRL','ALT','LEFT','DOWN','RIGHT','PGDN']]"; // Double row
++    public static final String DEFAULT_IVALUE_EXTRA_KEYS = "[['ESC','DRAWER',{key: '-', popup: '|'},'HOME','UP','END','PGUP'], ['TAB','CTRL','ALT','LEFT','DOWN','RIGHT','PGDN']]"; // Double row
+ 
+     /** Defines the key for extra keys style */
+     public static final String KEY_EXTRA_KEYS_STYLE =  "extra-keys-style"; // Default: "extra-keys-style"
