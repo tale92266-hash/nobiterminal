@@ -17,6 +17,26 @@ apply_patches() {
         patch -p1 < "$patch"
     done
 
+    # patch(1) leaves the pre-patch original behind as "<file>.orig" whenever
+    # a hunk applies with an offset or fuzz (which routinely happens when a
+    # base patch touches a file an earlier plugin patch already shifted).
+    # Nothing in this generator reads those backups, and under an Android
+    # res/ directory they are fatal: the resource merger rejects any file
+    # whose name does not end with .xml (this killed the v4 app build at
+    # :app:mergeDebugResources over activity_termux.xml.orig). Remove them
+    # so the patched tree always stays buildable.
+    find . -type f -name "*.orig" -delete
+
+    # A leftover ".rej" file means a hunk did not apply at all. Never
+    # continue with a half-patched tree - fail loudly instead.
+    local rejects=$(find . -type f -name "*.rej")
+    if [[ -n "$rejects" ]]; then
+        echo "ERROR: patch rejects left behind in $targetdir:" >&2
+        echo "$rejects" >&2
+        popd
+        return 1
+    fi
+
     popd
 }
 
