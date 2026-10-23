@@ -18847,10 +18847,10 @@ index 0000000..d6b2b4f
 +}
 diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/MinimapView.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/MinimapView.kt
 new file mode 100644
-index 0000000..20bffe5
+index 0000000..0000ff5
 --- /dev/null
 +++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/MinimapView.kt
-@@ -0,0 +1,207 @@
+@@ -0,0 +1,210 @@
 +package com.nobidev.nobicode.editor
 +
 +import android.content.Context
@@ -18895,6 +18895,9 @@ index 0000000..20bffe5
 +
 +    var barColor: Int = 0xFF8B8B9E.toInt()
 +    var viewportColor: Int = 0x4D8B7CF6.toInt()
++    // @JvmField: a generated setBackgroundColor(I)V would clash with
++    // View.setBackgroundColor(int) (accidental override, Kotlin 2.x error).
++    @JvmField
 +    var backgroundColor: Int = 0xFF14151D.toInt()
 +
 +    private val bgPaint = Paint()
