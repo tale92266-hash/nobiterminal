@@ -11,23 +11,33 @@
  termux_step_create_debscripts() {
 --- a/packages/termux-tools/build.sh
 +++ b/packages/termux-tools/build.sh
-@@ -21,6 +21,19 @@ TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, gr
+@@ -21,6 +21,29 @@ TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, gr
  TERMUX_PKG_RECOMMENDS="ed, dos2unix, inetutils, net-tools, patch, unzip"
  
  termux_step_pre_configure() {
 +	. "$TERMUX_SCRIPTDIR/scripts/termux_generator_utils.sh"
 +   replace_termux_name "$TERMUX_PKG_SRCDIR" "$TERMUX_APP__PACKAGE_NAME"
 +   replace_termux_user_path "$TERMUX_PKG_SRCDIR" "${TERMUX_APP__USER_PATH:-/data/data}"
-+	printf '%s\n' \
-+		'  _   _  ____  ____  _____' \
-+		' | \ | |/ __ \|  _ \|_   _|' \
-+		' |  \| | |  | | |_) | | |' \
-+		' | . ` | |  | |  _ <  | |' \
-+		' | |\  | |__| | |_) |_| |_' \
-+		' |_| \_|\____/|____/|_____|' \
-+		'      T E R M I N A L' \
-+		'   Welcome back, Sam.' \
-+		'   Your terminal. Your rules.' > motds/motd
++	printf '%b\n' \
++		'\033[1;38;5;27m█    █  ████  █████  █████ █████  ████\033[0m' \
++		'\033[1;38;5;33m██   █ █    █ █    █   █     █   █    █\033[0m' \
++		'\033[1;38;5;39m█ ██ █ █    █ █████    █     █   ██████\033[0m' \
++		'\033[1;38;5;45m█  ███ █    █ █    █   █     █   █    █\033[0m' \
++		'\033[1;38;5;51m█    █  ████  █████  █████   █   █    █\033[0m' \
++		'\033[1;38;5;141m   Welcome back, Sam.\033[0m' \
++		'\033[38;5;51m   Your terminal. Your rules.\033[0m' > motds/motd
++	cat >> termux-login.sh.in <<'NOBI_LOGIN_EOF'
++
++# NobiTerminal: time-aware greeting, printed by the login script before the shell starts.
++_nobi_hour="$(date +%H 2>/dev/null)"
++case "$_nobi_hour" in
++0[0-9]|1[01]) _nobi_greeting="Good morning" ;;
++12|1[3-6]) _nobi_greeting="Good afternoon" ;;
++*) _nobi_greeting="Good evening" ;;
++esac
++printf '\033[1;38;5;141m%s, Sam.\033[0m\n' "$_nobi_greeting"
++unset _nobi_hour _nobi_greeting
++NOBI_LOGIN_EOF
  	autoreconf -vfi
  }
  
