@@ -382,10 +382,10 @@ index 0000000..0e12423
 +}
 diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
 new file mode 100644
-index 0000000..4388c25
+index 0000000..eb95187
 --- /dev/null
 +++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
-@@ -0,0 +1,12433 @@
+@@ -0,0 +1,12438 @@
 +package com.nobidev.nobicode
 +
 +import android.app.Dialog
@@ -8052,7 +8052,7 @@ index 0000000..4388c25
 +        if (body.isEmpty()) {
 +            Toast.makeText(this, "Body khaali hai", Toast.LENGTH_SHORT).show(); return
 +        }
-+        val hadBraces = outer.second || inner.second.contains('\n')
++        val hadBraces = outer.third || inner.third
 +        val merged = if (hadBraces) {
 +            val lineS = text.lastIndexOf('\n', (ifStart - 1).coerceAtLeast(0)) + 1
 +            val ind = text.substring(lineS, ifStart).takeWhile { it == ' ' || it == '\t' }
@@ -8248,6 +8248,10 @@ index 0000000..4388c25
 +            if (clean.isEmpty()) return "Item"
 +            return clean.replaceFirstChar(Char::uppercase)
 +        }
++        // buildClassFn breaks the typeOf <-> buildClass mutual-recursion
++        // cycle: Kotlin does not resolve forward references to local
++        // functions, so typeOf calls buildClass through this variable.
++        lateinit var buildClassFn: (String, org.json.JSONObject) -> String
 +        fun typeOf(v: Any?, key: String, owner: String): String {
 +            return when (v) {
 +                null, org.json.JSONObject.NULL -> "Any?"
@@ -8258,7 +8262,7 @@ index 0000000..4388c25
 +                is Double, is Float -> "Double"
 +                is org.json.JSONObject -> {
 +                    val cn = uniqueName(cap(key))
-+                    nested.add(buildClass(cn, v))
++                    nested.add(buildClassFn(cn, v))
 +                    cn
 +                }
 +                is org.json.JSONArray -> {
@@ -8285,6 +8289,7 @@ index 0000000..4388c25
 +            sb.append("\n)")
 +            return sb.toString()
 +        }
++        buildClassFn = ::buildClass
 +        val trimmed = jsonStr.trim()
 +        val code: String
 +        if (trimmed.startsWith("{")) {
@@ -8802,8 +8807,8 @@ index 0000000..4388c25
 +            return
 +        }
 +        // Dialog me list dikhao.
-+        val items = hits.map { """ + it.value.take(60) +
-+            (if (it.value.length > 60) "..." else "") + "" - L" + it.line }
++        val items = hits.map { "\"" + it.value.take(60) +
++            (if (it.value.length > 60) "..." else "") + "\" - L" + it.line }
 +        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
 +            .setTitle(hits.size.toString() + " hardcoded strings")
 +            .setItems(items.toTypedArray()) { _, which ->
