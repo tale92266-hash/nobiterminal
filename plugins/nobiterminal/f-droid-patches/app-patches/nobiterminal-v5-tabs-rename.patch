@@ -1,0 +1,135 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+index 5daec77..f8b943c 100644
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+@@ -1,12 +1,15 @@
+ package com.termux.app.terminal;
+ 
++import android.app.AlertDialog;
+ import android.content.Context;
+ import android.content.SharedPreferences;
+ import android.graphics.Paint;
+ import android.text.TextUtils;
++import android.view.GestureDetector;
+ import android.view.Gravity;
+ import android.view.MotionEvent;
+ import android.view.View;
++import android.widget.EditText;
+ import android.widget.HorizontalScrollView;
+ import android.widget.LinearLayout;
+ import android.widget.TextView;
+@@ -18,7 +21,11 @@ import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
+ import com.termux.terminal.TerminalSession;
+ 
+ import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.List;
++import java.util.Map;
++import java.util.Set;
+ 
+ /**
+  * NobiTerminal session tabs bar controller.
+@@ -35,6 +42,7 @@ public class NobiTabsController {
+ 
+     private static final String PREFS_NAME = "nobi_tabs";
+     private static final String PREF_KEY_ORDER = "tab_order";
++    private static final String PREF_KEY_NAMES = "tab_names";
+ 
+     private static final int COLOR_TAB_ACTIVE_BG = 0xFF1B2452;
+     private static final int COLOR_TAB_INACTIVE_BG = 0xFF101736;
+@@ -208,17 +216,93 @@ public class NobiTabsController {
+             refreshTabs();
+         });
+         tab.setOnLongClickListener(v -> startDrag(tab, session));
+-        tab.setOnTouchListener((v, event) -> onTabTouch(tab, session, event));
++        final GestureDetector tabGestureDetector = new GestureDetector(mActivity,
++            new GestureDetector.SimpleOnGestureListener() {
++                @Override
++                public boolean onDoubleTap(MotionEvent e) {
++                    showRenameDialog(session);
++                    return true;
++                }
++            });
++        tab.setOnTouchListener((v, event) -> {
++            tabGestureDetector.onTouchEvent(event);
++            return onTabTouch(tab, session, event);
++        });
+         return tab;
+     }
+ 
+     private String resolveTabLabel(TerminalSession session, int displayIndex) {
++        String customName = loadTabNames().get(session.mHandle);
++        if (!TextUtils.isEmpty(customName)) return customName;
+         if (!TextUtils.isEmpty(session.mSessionName)) return session.mSessionName;
+         String title = session.getTitle();
+         if (!TextUtils.isEmpty(title)) return title;
+         return String.valueOf(displayIndex + 1);
+     }
+ 
++    // region Tab rename (double-tap a tab)
++
++    /**
++     * Custom tab names keyed by session handle, persisted in the same
++     * "nobi_tabs" preferences file as the tab order, as a string set of
++     * "handle<TAB>name" entries.
++     */
++    private Map<String, String> loadTabNames() {
++        Map<String, String> names = new HashMap<>();
++        Set<String> saved = getPrefs().getStringSet(PREF_KEY_NAMES, null);
++        if (saved != null) {
++            for (String entry : saved) {
++                int separator = entry.indexOf('\t');
++                if (separator > 0)
++                    names.put(entry.substring(0, separator), entry.substring(separator + 1));
++            }
++        }
++        return names;
++    }
++
++    /** Save (or, for an empty name, clear) the custom name of a session tab. */
++    private void saveTabName(TerminalSession session, String name) {
++        Map<String, String> names = loadTabNames();
++        if (TextUtils.isEmpty(name))
++            names.remove(session.mHandle);
++        else
++            names.put(session.mHandle, name);
++
++        Set<String> entries = new HashSet<>();
++        for (Map.Entry<String, String> entry : names.entrySet())
++            entries.add(entry.getKey() + "\t" + entry.getValue());
++        getPrefs().edit().putStringSet(PREF_KEY_NAMES, entries).apply();
++    }
++
++    private void showRenameDialog(final TerminalSession session) {
++        String customName = loadTabNames().get(session.mHandle);
++
++        final EditText input = new EditText(mActivity);
++        input.setSingleLine(true);
++        input.setHint("Tab name");
++        input.setText(customName != null ? customName :
++            resolveTabLabel(session, mOrderedSessions.indexOf(session)));
++        input.setSelectAllOnFocus(true);
++        int horizontalPadding = dp(20);
++        input.setPadding(horizontalPadding, dp(12), horizontalPadding, dp(4));
++
++        new AlertDialog.Builder(mActivity)
++            .setTitle("Rename tab")
++            .setView(input)
++            .setPositiveButton("Save", (dialog, which) -> {
++                saveTabName(session, input.getText().toString().trim());
++                refreshTabs();
++            })
++            .setNegativeButton("Cancel", null)
++            .setNeutralButton("Reset", (dialog, which) -> {
++                saveTabName(session, null);
++                refreshTabs();
++            })
++            .show();
++    }
++
++    // endregion
++
+     /**
+      * Close a session from its tab. A running session is killed first (the same
+      * primitive the app's own "kill process" action uses); the actual removal

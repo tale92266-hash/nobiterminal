@@ -1,0 +1,128 @@
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+index 1d0dfe1..bae8ae0 100644
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -56,7 +56,7 @@
+             android:label="@string/application_name"
+             android:launchMode="singleTask"
+             android:resizeableActivity="true"
+-            android:theme="@style/Theme.TermuxActivity.DayNight.NoActionBar"
++            android:theme="@style/Theme.NobiTerminal.Launch"
+             tools:targetApi="n">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+diff --git a/termux-app/app/src/main/res/drawable/ic_foreground.xml b/termux-app/app/src/main/res/drawable/ic_foreground.xml
+index 3f3e59b..fbf559e 100644
+--- a/termux-app/app/src/main/res/drawable/ic_foreground.xml
++++ b/termux-app/app/src/main/res/drawable/ic_foreground.xml
+@@ -4,25 +4,21 @@
+     android:viewportWidth="108"
+     android:viewportHeight="108">
+ 
+-    <!-- Keep in sync with non-adaptive ic_launcher.xml -->
+-    <path
+-        android:fillColor="#FFFFFF"
+-        android:pathData="M34,38
+-                          h6
+-                          l12,16
+-                          l-12,16
+-                          h-6
+-                          l12,-16
+-                          "
+-        />
++    <!-- NobiTerminal neon "N" launcher mark: violet underlay offset behind
++         the cyan letterform. Keep in sync with non-adaptive ic_launcher.xml -->
++
++    <group
++        android:translateX="3"
++        android:translateY="3">
++        <path
++            android:fillColor="#8B5CF6"
++            android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z"
++            />
++    </group>
+ 
+     <path
+-        android:fillColor="#FFFFFF"
+-        android:pathData="M56,66
+-                          h18
+-                          v4
+-                          h-18
+-                          "
++        android:fillColor="#22D3EE"
++        android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z"
+         />
+ 
+ </vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_splash_background.xml b/termux-app/app/src/main/res/drawable/nobi_splash_background.xml
+new file mode 100644
+index 0000000..f5bc228
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_splash_background.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Branded cold-start background: brand navy with the neon N mark centered.
++     Shown only until the terminal activity draws; never a delay gate. -->
++<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:drawable="@color/nobi_splash_background" />
++    <item
++        android:width="132dp"
++        android:height="132dp"
++        android:gravity="center"
++        android:drawable="@drawable/ic_foreground" />
++</layer-list>
+diff --git a/termux-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml b/termux-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+index 61bc6d9..a431805 100644
+--- a/termux-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
++++ b/termux-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+-    <background android:drawable="@android:color/black"/>
++    <background android:drawable="@color/nobi_icon_background"/>
+     <foreground android:drawable="@drawable/ic_foreground"/>
+     <monochrome android:drawable="@drawable/ic_foreground"/>
+ </adaptive-icon>
+diff --git a/termux-app/app/src/main/res/values-v31/themes.xml b/termux-app/app/src/main/res/values-v31/themes.xml
+new file mode 100644
+index 0000000..30589bc
+--- /dev/null
++++ b/termux-app/app/src/main/res/values-v31/themes.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++
++    <!-- Android 12+ splash screen attributes for the launch theme. -->
++    <style name="Theme.NobiTerminal.Launch" parent="Theme.TermuxActivity.DayNight.NoActionBar">
++        <item name="android:windowBackground">@drawable/nobi_splash_background</item>
++        <item name="android:windowSplashScreenBackground">@color/nobi_splash_background</item>
++        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_foreground</item>
++    </style>
++
++</resources>
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index 045e125..4bdf832 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -1,3 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
++    <!-- NobiTerminal brand navy, used as launcher icon and splash background. -->
++    <color name="nobi_icon_background">#070B1F</color>
++    <color name="nobi_splash_background">#070B1F</color>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index 71a8ae4..d76d2a8 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -46,4 +46,10 @@
+         <item name="extraKeysButtonActiveBackgroundColor">@color/grey_500</item>
+     </style>
+ 
++    <!-- NobiTerminal launch theme: branded splash window background, replaced
++         as soon as the terminal activity applies its own styling. -->
++    <style name="Theme.NobiTerminal.Launch" parent="Theme.TermuxActivity.DayNight.NoActionBar">
++        <item name="android:windowBackground">@drawable/nobi_splash_background</item>
++    </style>
++
+ </resources>

@@ -1,0 +1,83 @@
+diff --git a/termux-app/app/build.gradle b/termux-app/app/build.gradle
+index 8e4d6a0..11ad0be 100644
+--- a/termux-app/app/build.gradle
++++ b/termux-app/app/build.gradle
+@@ -26,6 +26,7 @@ android {
+         implementation "androidx.annotation:annotation:1.9.0"
+         implementation "androidx.core:core:1.13.1"
+         implementation "androidx.drawerlayout:drawerlayout:1.2.0"
++        implementation project(":nobicode")
+         implementation "androidx.preference:preference:1.2.1"
+         implementation "androidx.viewpager:viewpager:1.0.0"
+         implementation "com.google.android.material:material:1.12.0"
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
+index 632a3dd..effcd24 100644
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
+@@ -135,6 +135,14 @@ public final class NobiTerminalUtils {
+                     "#8B5CF6", "#E879F9", "#22D3EE", "#E5E9FF",
+                     "#2A336B", "#F43F5E", "#6EE7B7", "#FDE68A",
+                     "#A78BFA", "#F0ABFC", "#67E8F9", "#FFFFFF"};
++            case "dark":
++                // Stock Termux default color scheme.
++                return new String[]{
++                    "#000000", "#FFFFFF", "#FFFFFF",
++                    "#000000", "#CD0000", "#00CD00", "#CDCD00",
++                    "#6495ED", "#CD00CD", "#00CDCD", "#E5E5E5",
++                    "#7F7F7F", "#FF0000", "#00FF00", "#FFFF00",
++                    "#5C5CFF", "#FF00FF", "#00FFFF", "#FFFFFF"};
+             case "dracula":
+                 return new String[]{
+                     "#282A36", "#F8F8F2", "#F8F8F2",
+diff --git a/termux-app/app/src/main/res/values/nobi_settings_arrays.xml b/termux-app/app/src/main/res/values/nobi_settings_arrays.xml
+index e83bce7..3c2f44e 100644
+--- a/termux-app/app/src/main/res/values/nobi_settings_arrays.xml
++++ b/termux-app/app/src/main/res/values/nobi_settings_arrays.xml
+@@ -3,6 +3,7 @@
+ 
+     <string-array name="nobi_theme_entries">
+         <item>Nobi Neon</item>
++        <item>Dark</item>
+         <item>Dracula</item>
+         <item>Matrix</item>
+         <item>Solarized Dark</item>
+@@ -13,6 +14,7 @@
+ 
+     <string-array name="nobi_theme_entry_values">
+         <item>nobi_neon</item>
++        <item>dark</item>
+         <item>dracula</item>
+         <item>matrix</item>
+         <item>solarized_dark</item>
+diff --git a/termux-app/build.gradle b/termux-app/build.gradle
+index 65f0e42..72a1632 100644
+--- a/termux-app/build.gradle
++++ b/termux-app/build.gradle
+@@ -5,6 +5,7 @@ buildscript {
+     }
+     dependencies {
+         classpath "com.android.tools.build:gradle:8.13.2"
++        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21"
+     }
+ }
+ 
+diff --git a/termux-app/settings.gradle b/termux-app/settings.gradle
+index b8045c2..95eebbd 100644
+--- a/termux-app/settings.gradle
++++ b/termux-app/settings.gradle
+@@ -1 +1,2 @@
+ include ':app', ':termux-shared', ':terminal-emulator', ':terminal-view'
++include ':nobicode'
+diff --git a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java
+index 534936f..d438f4e 100644
+--- a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java
++++ b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java
+@@ -347,7 +347,7 @@ public final class TermuxConstants {
+      */
+ 
+     /** Termux app name */
+-    public static final String TERMUX_APP_NAME = "Termux"; // Default: "Termux"
++    public static final String TERMUX_APP_NAME = "NobiTerminal"; // Default: "Termux"
+     /** Termux package name */
+     public static final String TERMUX_PACKAGE_NAME = "com.termux"; // Default: "com.termux"
+     /** Termux GitHub repo name */

@@ -1,0 +1,4187 @@
+diff --git a/termux-app/nobicode/src/main/res/layout/activity_crash_report.xml b/termux-app/nobicode/src/main/res/layout/activity_crash_report.xml
+new file mode 100644
+index 0000000..6ce972a
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/activity_crash_report.xml
+@@ -0,0 +1,74 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:orientation="vertical"
++    android:background="#12131B"
++    android:fitsSystemWindows="true">
++
++    <!-- Header -->
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="center_vertical"
++        android:padding="16dp"
++        android:background="#1A1B26">
++
++        <TextView
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:text="😢 NobiIDE Crash Ho Gaya"
++            android:textColor="#E6E9F5"
++            android:textSize="20sp"
++            android:textStyle="bold" />
++    </LinearLayout>
++
++    <!-- Scrollable crash log -->
++    <ScrollView
++        android:layout_width="match_parent"
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        android:padding="16dp"
++        android:fillViewport="true">
++
++        <TextView
++            android:id="@+id/crashLogView"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:textColor="#B0B3C0"
++            android:textSize="12sp"
++            android:fontFamily="monospace"
++            android:textIsSelectable="true" />
++    </ScrollView>
++
++    <!-- Buttons always visible at bottom -->
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:padding="16dp"
++        android:gravity="center">
++
++        <Button
++            android:id="@+id/shareCrashBtn"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:layout_marginEnd="8dp"
++            android:text="📤 Share"
++            android:textColor="#FFFFFF"
++            android:backgroundTint="#8B7CF6" />
++
++        <Button
++            android:id="@+id/restartAppBtn"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:layout_marginStart="8dp"
++            android:text="🔄 Restart"
++            android:textColor="#FFFFFF"
++            android:backgroundTint="#2A2B3A" />
++    </LinearLayout>
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/activity_main.xml b/termux-app/nobicode/src/main/res/layout/activity_main.xml
+new file mode 100644
+index 0000000..f472385
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/activity_main.xml
+@@ -0,0 +1,589 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.drawerlayout.widget.DrawerLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:id="@+id/drawer"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:fitsSystemWindows="false">
++
++    <LinearLayout
++        android:id="@+id/mainRoot"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:orientation="vertical"
++        android:background="?attr/colorSurface">
++
++        <!-- Top Header App Bar -->
++        <com.google.android.material.appbar.AppBarLayout
++            android:id="@+id/appBar"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:background="?attr/colorSurface"
++            app:elevation="0dp">
++
++            <com.google.android.material.appbar.MaterialToolbar
++                android:id="@+id/toolbar"
++                android:layout_width="match_parent"
++                android:layout_height="?attr/actionBarSize"
++                android:background="@android:color/transparent"
++                app:navigationIcon="@drawable/ic_menu"
++                app:title="@string/app_name"
++                app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
++                app:menu="@menu/main_menu" />
++
++        </com.google.android.material.appbar.AppBarLayout>
++
++        <!-- Horizontal Tab Bar -->
++        <HorizontalScrollView
++            android:id="@+id/tabScroll"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:scrollbars="none"
++            android:background="?attr/colorSurface">
++
++            <LinearLayout
++                android:id="@+id/tabContainer"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:orientation="horizontal"
++                android:paddingStart="8dp"
++                android:paddingEnd="8dp"
++                android:paddingTop="2dp"
++                android:paddingBottom="6dp" />
++
++        </HorizontalScrollView>
++
++        <View
++            android:layout_width="match_parent"
++            android:layout_height="1dp"
++            android:background="?attr/colorOutlineVariant"
++            android:alpha="0.4" />
++
++        <!-- Breadcrumb navigation strip -->
++        <HorizontalScrollView
++            android:id="@+id/breadcrumbScroll"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:scrollbars="none"
++            android:background="?attr/colorSurface"
++            android:visibility="gone">
++
++            <LinearLayout
++                android:id="@+id/breadcrumbContainer"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="4dp"
++                android:paddingEnd="12dp"
++                android:paddingTop="2dp"
++                android:paddingBottom="2dp" />
++
++        </HorizontalScrollView>
++
++        <!-- Editor View Container -->
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="0dp"
++            android:layout_weight="1">
++
++            <com.nobidev.nobicode.editor.CodeEditorView
++                android:id="@+id/editor"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent" />
++
++            <com.nobidev.nobicode.editor.MinimapView
++                android:id="@+id/minimap"
++                android:layout_width="56dp"
++                android:layout_height="match_parent"
++                android:layout_gravity="end"
++                android:layout_marginEnd="10dp"
++                android:visibility="gone" />
++
++            <ImageButton
++                android:id="@+id/zenExitBtn"
++                android:layout_width="48dp"
++                android:layout_height="48dp"
++                android:layout_gravity="bottom|end"
++                android:layout_margin="16dp"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                android:src="@drawable/ic_close"
++                android:contentDescription="Exit zen mode"
++                android:visibility="gone" />
++
++            <WebView
++                android:id="@+id/markdownPreview"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:visibility="gone" />
++
++            <WebView
++                android:id="@+id/htmlPreview"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:visibility="gone" />
++
++            <ProgressBar
++                android:id="@+id/editorLoadingSpinner"
++                android:layout_width="36dp"
++                android:layout_height="36dp"
++                android:layout_gravity="center"
++                android:indeterminateTint="?attr/colorPrimary"
++                android:visibility="gone" />
++
++            <!-- Custom draggable scrollbar thumb: enlarges while scrolling/dragging -->
++            <View
++                android:id="@+id/editorScrollThumb"
++                android:layout_width="8dp"
++                android:layout_height="64dp"
++                android:layout_gravity="end|top"
++                android:layout_marginEnd="4dp"
++                android:background="@drawable/bg_scrollbar_thumb"
++                android:alpha="0.55"
++                android:visibility="gone" />
++
++            <!-- Welcome / empty state: shown when only an empty untitled tab is open -->
++            <LinearLayout
++                android:id="@+id/welcomeView"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:orientation="vertical"
++                android:gravity="center"
++                android:padding="32dp"
++                android:background="?attr/colorSurface"
++                android:visibility="gone">
++
++                <ImageView
++                    android:layout_width="240dp"
++                    android:layout_height="140dp"
++                    android:src="@drawable/img_welcome"
++                    android:scaleType="centerCrop" />
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="20dp"
++                    android:text="Welcome to NobiCode"
++                    android:textSize="22sp"
++                    android:textStyle="bold"
++                    android:textColor="?attr/colorOnSurface" />
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="8dp"
++                    android:gravity="center"
++                    android:text="Open a folder or file to start coding"
++                    android:textSize="14sp"
++                    android:textColor="?attr/colorOnSurfaceVariant" />
++
++                <com.google.android.material.button.MaterialButton
++                    android:id="@+id/welcomeOpenFolder"
++                    style="@style/Widget.Material3.Button"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="28dp"
++                    android:text="Open Folder"
++                    app:icon="@drawable/ic_folder_open" />
++
++                <com.google.android.material.button.MaterialButton
++                    android:id="@+id/welcomeOpenFile"
++                    style="@style/Widget.Material3.Button.OutlinedButton"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="12dp"
++                    android:text="Open File"
++                    app:icon="@drawable/ic_file" />
++
++            </LinearLayout>
++
++        </FrameLayout>
++
++        <!-- Status Line Bar -->
++        <LinearLayout
++            android:id="@+id/statusBar"
++            android:layout_width="match_parent"
++            android:layout_height="24dp"
++            android:background="?attr/colorSurfaceContainerLow"
++            android:orientation="horizontal"
++            android:gravity="center_vertical"
++            android:paddingStart="12dp"
++            android:paddingEnd="12dp">
++
++            <ImageView
++                android:id="@+id/statusLangIcon"
++                android:layout_width="14dp"
++                android:layout_height="14dp"
++                android:src="@drawable/ic_code"
++                android:scaleType="fitCenter" />
++
++            <TextView
++                android:id="@+id/statusLang"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_marginStart="6dp"
++                android:text="@string/status_lang"
++                android:textSize="11sp"
++                android:textStyle="bold"
++                android:textColor="?attr/colorOnSurfaceVariant" />
++
++            <View
++                android:id="@+id/statusModifiedDot"
++                android:layout_width="6dp"
++                android:layout_height="6dp"
++                android:layout_marginStart="8dp"
++                android:background="@drawable/bg_scrollbar"
++                android:backgroundTint="@color/accent_dot"
++                android:visibility="gone" />
++
++            <View
++                android:layout_width="0dp"
++                android:layout_height="1dp"
++                android:layout_weight="1" />
++
++            <TextView
++                android:id="@+id/statusPos"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:text="@string/status_line"
++                android:textSize="11sp"
++                android:textColor="?attr/colorOnSurfaceVariant" />
++
++            <View
++                android:layout_width="1dp"
++                android:layout_height="10dp"
++                android:layout_marginStart="8dp"
++                android:layout_marginEnd="8dp"
++                android:background="?attr/colorOnSurfaceVariant"
++                android:alpha="0.3" />
++
++            <TextView
++                android:id="@+id/statusEncoding"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:text="@string/status_encoding"
++                android:textSize="11sp"
++                android:textColor="?attr/colorOnSurfaceVariant" />
++
++        </LinearLayout>
++
++        <View
++            android:layout_width="match_parent"
++            android:layout_height="1dp"
++            android:background="?attr/colorOutlineVariant"
++            android:alpha="0.4" />
++
++        <!-- Symbols bar: phone keyboard par mushkil wale symbols ek tap par -->
++        <HorizontalScrollView
++            android:id="@+id/symbolsBar"
++            android:layout_width="match_parent"
++            android:layout_height="48dp"
++            android:background="?attr/colorSurfaceContainerLow"
++            android:scrollbars="none"
++            android:fillViewport="true">
++
++            <LinearLayout
++                android:id="@+id/symbolsContainer"
++                android:layout_width="wrap_content"
++                android:layout_height="match_parent"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="4dp"
++                android:paddingEnd="4dp" />
++        </HorizontalScrollView>
++
++        <!-- Pure Modern Footer (Undo, Redo, Save, Find, Select All, Paste, Clear All) -->
++        <LinearLayout
++            android:id="@+id/footerBar"
++            android:layout_width="match_parent"
++            android:layout_height="44dp"
++            android:background="?attr/colorSurfaceContainerLow"
++            android:orientation="horizontal"
++            android:gravity="center_vertical"
++            android:paddingStart="4dp"
++            android:paddingEnd="4dp">
++
++            <ImageView
++                android:id="@+id/btnUndo"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_undo"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Undo" />
++
++            <ImageView
++                android:id="@+id/btnRedo"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_redo"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Redo" />
++
++            <ImageView
++                android:id="@+id/btnSave"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_save"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Save" />
++
++            <ImageView
++                android:id="@+id/btnFind"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_search"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Find" />
++
++            <ImageView
++                android:id="@+id/btnSelectAll"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_select_all"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Select All" />
++
++            <ImageView
++                android:id="@+id/btnPaste"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_content_paste"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Paste" />
++
++            <ImageView
++                android:id="@+id/btnClearAll"
++                android:layout_width="0dp"
++                android:layout_height="38dp"
++                android:layout_weight="1"
++                android:padding="8dp"
++                android:src="@drawable/ic_clear_all"
++                android:background="@drawable/bg_footer_btn"
++                app:tint="?attr/colorOnSurface"
++                android:contentDescription="Clear All" />
++
++        </LinearLayout>
++
++    </LinearLayout>
++
++    <!-- File Manager Sidebar Drawer (3-Line Navigation Menu) -->
++    <LinearLayout
++        android:id="@+id/drawerContent"
++        android:layout_width="320dp"
++        android:layout_height="match_parent"
++        android:layout_gravity="start"
++        android:orientation="vertical"
++        android:background="?attr/colorSurfaceContainerLow">
++
++        <!-- Top Header: Title, Path, Refresh & New File Buttons -->
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:gravity="center_vertical"
++            android:paddingStart="16dp"
++            android:paddingEnd="12dp"
++            android:paddingTop="12dp"
++            android:paddingBottom="6dp">
++
++            <LinearLayout
++                android:layout_width="0dp"
++                android:layout_height="wrap_content"
++                android:layout_weight="1"
++                android:orientation="vertical">
++
++                <TextView
++                    android:id="@+id/drawerCurrentFolder"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:text="@string/app_name"
++                    android:textSize="17sp"
++                    android:textStyle="bold"
++                    android:singleLine="true"
++                    android:ellipsize="end"
++                    android:textColor="?attr/colorOnSurface" />
++
++                <TextView
++                    android:id="@+id/drawerPath"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:text="@string/drawer_empty"
++                    android:textSize="11sp"
++                    android:singleLine="true"
++                    android:ellipsize="start"
++                    android:textColor="?attr/colorOnSurfaceVariant" />
++            </LinearLayout>
++
++            <ImageView
++                android:id="@+id/quickOpenBtn"
++                android:layout_width="36dp"
++                android:layout_height="36dp"
++                android:padding="8dp"
++                android:src="@drawable/ic_search"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                app:tint="?attr/colorOnSurfaceVariant"
++                android:contentDescription="Quick open" />
++
++            <ImageView
++                android:id="@+id/remoteBtn"
++                android:layout_width="36dp"
++                android:layout_height="36dp"
++                android:padding="8dp"
++                android:src="@drawable/ic_cloud"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                app:tint="?attr/colorOnSurfaceVariant"
++                android:contentDescription="Remote servers" />
++
++            <ImageView
++                android:id="@+id/refreshBtn"
++                android:layout_width="36dp"
++                android:layout_height="36dp"
++                android:padding="8dp"
++                android:src="@drawable/ic_refresh"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                app:tint="?attr/colorOnSurfaceVariant"
++                android:contentDescription="@string/cd_refresh" />
++
++            <ImageView
++                android:id="@+id/newEntryBtn"
++                android:layout_width="36dp"
++                android:layout_height="36dp"
++                android:padding="8dp"
++                android:src="@drawable/ic_add"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                app:tint="?attr/colorOnSurfaceVariant"
++                android:contentDescription="@string/file_new" />
++
++        </LinearLayout>
++
++        <!-- Action Row: Folder Actions in Sidebar -->
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:orientation="horizontal"
++            android:layout_marginStart="14dp"
++            android:layout_marginEnd="14dp"
++            android:layout_marginTop="4dp"
++            android:layout_marginBottom="8dp">
++
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/pickFolderBtn"
++                style="@style/Widget.Material3.Button"
++                android:layout_width="0dp"
++                android:layout_height="48dp"
++                android:layout_weight="1"
++                android:text="@string/drawer_pick"
++                android:textSize="14sp"
++                app:icon="@drawable/ic_folder_open"
++                app:iconSize="20dp"
++                app:cornerRadius="14dp"
++                android:insetTop="0dp"
++                android:insetBottom="0dp" />
++
++        </LinearLayout>
++
++        <View
++            android:layout_width="match_parent"
++            android:layout_height="1dp"
++            android:background="?attr/colorOutlineVariant"
++            android:alpha="0.4" />
++
++        <!-- Fast File Manager RecyclerView -->
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="0dp"
++            android:layout_weight="1">
++
++            <androidx.recyclerview.widget.RecyclerView
++                android:id="@+id/fileRecyclerView"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:scrollbars="vertical"
++                android:clipToPadding="false"
++                android:paddingBottom="24dp" />
++
++            <ProgressBar
++                android:id="@+id/drawerLoadingProgress"
++                android:layout_width="32dp"
++                android:layout_height="32dp"
++                android:layout_gravity="center"
++                android:indeterminateTint="?attr/colorPrimary"
++                android:visibility="gone" />
++
++            <TextView
++                android:id="@+id/emptyFolderText"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_gravity="center"
++                android:text="Folder is empty"
++                android:textSize="13sp"
++                android:textColor="?attr/colorOnSurfaceVariant"
++                android:visibility="gone" />
++
++            <!-- Friendly empty state when no folder is opened -->
++            <LinearLayout
++                android:id="@+id/drawerEmptyState"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:orientation="vertical"
++                android:gravity="center"
++                android:padding="32dp"
++                android:visibility="gone">
++
++                <ImageView
++                    android:layout_width="match_parent"
++                    android:layout_height="110dp"
++                    android:layout_marginBottom="8dp"
++                    android:src="@drawable/img_drawer_banner"
++                    android:scaleType="centerCrop" />
++
++                <ImageView
++                    android:layout_width="76dp"
++                    android:layout_height="76dp"
++                    android:src="@drawable/ic_folder_open"
++                    app:tint="?attr/colorPrimary"
++                    android:alpha="0.9" />
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="20dp"
++                    android:text="@string/drawer_empty_title"
++                    android:textSize="17sp"
++                    android:textStyle="bold"
++                    android:textColor="?attr/colorOnSurface" />
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="8dp"
++                    android:text="@string/drawer_empty_hint"
++                    android:textSize="13sp"
++                    android:gravity="center"
++                    android:textColor="?attr/colorOnSurfaceVariant" />
++
++            </LinearLayout>
++
++        </FrameLayout>
++
++    </LinearLayout>
++
++</androidx.drawerlayout.widget.DrawerLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/activity_project_manager.xml b/termux-app/nobicode/src/main/res/layout/activity_project_manager.xml
+new file mode 100644
+index 0000000..3936478
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/activity_project_manager.xml
+@@ -0,0 +1,62 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:orientation="vertical"
++    android:background="@color/surface">
++
++    <com.google.android.material.appbar.MaterialToolbar
++        android:id="@+id/pmToolbar"
++        android:layout_width="match_parent"
++        android:layout_height="?attr/actionBarSize"
++        android:background="@color/surface"
++        app:title="Projects"
++        app:titleTextColor="@color/on_surface"
++        app:menu="@menu/pm_menu" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/pmList"
++        android:layout_width="match_parent"
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        android:clipToPadding="false"
++        android:padding="8dp" />
++
++    <LinearLayout
++        android:id="@+id/pmEmpty"
++        android:layout_width="match_parent"
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        android:gravity="center"
++        android:orientation="vertical"
++        android:visibility="gone"
++        android:padding="32dp">
++
++        <ImageView
++            android:layout_width="72dp"
++            android:layout_height="72dp"
++            android:src="@drawable/ic_folder_open"
++            android:alpha="0.5" />
++
++        <TextView
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="16dp"
++            android:text="No projects yet"
++            android:textColor="@color/on_surface"
++            android:textSize="18sp" />
++
++        <TextView
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="8dp"
++            android:gravity="center"
++            android:text="Choose a folder to start your first project"
++            android:textColor="@color/on_surface_variant"
++            android:textSize="14sp" />
++
++    </LinearLayout>
++
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_clipboard.xml b/termux-app/nobicode/src/main/res/layout/dialog_clipboard.xml
+new file mode 100644
+index 0000000..8393e93
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_clipboard.xml
+@@ -0,0 +1,50 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="16dp">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="center_vertical">
++
++        <TextView
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:text="Clipboard history"
++            android:textSize="16sp"
++            android:textColor="?attr/colorOnSurface" />
++
++        <TextView
++            android:id="@+id/clipboardClear"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="Clear"
++            android:textSize="14sp"
++            android:textColor="?attr/colorPrimary"
++            android:padding="8dp" />
++
++    </LinearLayout>
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/clipboardList"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:maxHeight="340dp"
++        android:layout_marginTop="8dp" />
++
++    <TextView
++        android:id="@+id/clipboardEmpty"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="16dp"
++        android:gravity="center"
++        android:text="No clips yet"
++        android:visibility="gone"
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_color_picker.xml b/termux-app/nobicode/src/main/res/layout/dialog_color_picker.xml
+new file mode 100644
+index 0000000..72ed4f4
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_color_picker.xml
+@@ -0,0 +1,128 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="24dp">
++
++    <View
++        android:id="@+id/colorPreview"
++        android:layout_width="match_parent"
++        android:layout_height="64dp"
++        android:background="@drawable/bg_color_preview" />
++
++    <TextView
++        android:id="@+id/hexLabel"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_gravity="center_horizontal"
++        android:layout_marginTop="12dp"
++        android:text="#8B7CF6"
++        android:textSize="18sp"
++        android:textStyle="bold" />
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="16dp"
++        android:gravity="center_vertical"
++        android:orientation="horizontal">
++
++        <TextView
++            android:layout_width="24dp"
++            android:layout_height="wrap_content"
++            android:text="R"
++            android:textStyle="bold" />
++
++        <SeekBar
++            android:id="@+id/seekRed"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:max="255"
++            android:progressTint="#8B7CF6"
++            android:thumbTint="#8B7CF6" />
++
++        <TextView
++            android:id="@+id/redValue"
++            android:layout_width="44dp"
++            android:layout_height="wrap_content"
++            android:gravity="end"
++            android:text="139" />
++    </LinearLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:gravity="center_vertical"
++        android:orientation="horizontal">
++
++        <TextView
++            android:layout_width="24dp"
++            android:layout_height="wrap_content"
++            android:text="G"
++            android:textStyle="bold" />
++
++        <SeekBar
++            android:id="@+id/seekGreen"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:max="255"
++            android:progressTint="#8B7CF6"
++            android:thumbTint="#8B7CF6" />
++
++        <TextView
++            android:id="@+id/greenValue"
++            android:layout_width="44dp"
++            android:layout_height="wrap_content"
++            android:gravity="end"
++            android:text="124" />
++    </LinearLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:gravity="center_vertical"
++        android:orientation="horizontal">
++
++        <TextView
++            android:layout_width="24dp"
++            android:layout_height="wrap_content"
++            android:text="B"
++            android:textStyle="bold" />
++
++        <SeekBar
++            android:id="@+id/seekBlue"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:max="255"
++            android:progressTint="#8B7CF6"
++            android:thumbTint="#8B7CF6" />
++
++        <TextView
++            android:id="@+id/blueValue"
++            android:layout_width="44dp"
++            android:layout_height="wrap_content"
++            android:gravity="end"
++            android:text="246" />
++    </LinearLayout>
++
++    <TextView
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="16dp"
++        android:text="Presets"
++        android:textStyle="bold" />
++
++    <LinearLayout
++        android:id="@+id/presetRow"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:orientation="horizontal" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_command_palette.xml b/termux-app/nobicode/src/main/res/layout/dialog_command_palette.xml
+new file mode 100644
+index 0000000..f489eb7
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_command_palette.xml
+@@ -0,0 +1,34 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="16dp">
++
++    <EditText
++        android:id="@+id/paletteSearch"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="Type a command..."
++        android:singleLine="true"
++        android:imeOptions="actionSearch"
++        android:importantForAutofill="no" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/paletteList"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:maxHeight="340dp"
++        android:layout_marginTop="8dp" />
++
++    <TextView
++        android:id="@+id/paletteEmpty"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="16dp"
++        android:gravity="center"
++        android:text="No commands found"
++        android:visibility="gone"
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_credentials.xml b/termux-app/nobicode/src/main/res/layout/dialog_credentials.xml
+new file mode 100644
+index 0000000..6f835f3
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_credentials.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="8dp">
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="Username">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/credUser"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="text" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="Password / Token">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/credPass"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="textPassword" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_find_replace.xml b/termux-app/nobicode/src/main/res/layout/dialog_find_replace.xml
+new file mode 100644
+index 0000000..7437c33
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_find_replace.xml
+@@ -0,0 +1,127 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="20dp">
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:id="@+id/findWrap"
++        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="@string/find_hint"
++        app:startIconDrawable="@drawable/ic_search"
++        app:endIconMode="clear_text">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/findInput"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="text"
++            android:singleLine="true" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:id="@+id/replaceWrap"
++        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="@string/replace_hint"
++        app:endIconMode="clear_text">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/replaceInput"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="text"
++            android:singleLine="true" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:orientation="horizontal">
++
++        <com.google.android.material.checkbox.MaterialCheckBox
++            android:id="@+id/cbRegex"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/opt_regex"
++            android:textSize="13sp" />
++
++        <com.google.android.material.checkbox.MaterialCheckBox
++            android:id="@+id/cbCase"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="12dp"
++            android:text="@string/opt_case"
++            android:textSize="13sp" />
++
++    </LinearLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="4dp"
++        android:orientation="horizontal">
++
++        <com.google.android.material.checkbox.MaterialCheckBox
++            android:id="@+id/cbWholeWord"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/opt_word"
++            android:textSize="13sp" />
++
++    </LinearLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:orientation="horizontal"
++        android:gravity="end">
++
++        <TextView
++            android:id="@+id/findCount"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:layout_gravity="center_vertical"
++            android:textSize="13sp"
++            android:textColor="?attr/colorOnSurfaceVariant" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnCursors"
++            style="@style/Widget.Material3.Button.TextButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/find_cursors" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnNext"
++            style="@style/Widget.Material3.Button.TextButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/find_next" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnReplace"
++            style="@style/Widget.Material3.Button.TextButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/replace_one" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnReplaceAll"
++            style="@style/Widget.Material3.Button.TonalButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/replace_all" />
++
++    </LinearLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_goto.xml b/termux-app/nobicode/src/main/res/layout/dialog_goto.xml
+new file mode 100644
+index 0000000..fc5db41
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_goto.xml
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="20dp">
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:id="@+id/gotoWrap"
++        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="@string/goto_hint"
++        app:prefixText="# "
++        app:endIconMode="clear_text">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/gotoInput"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="number"
++            android:singleLine="true" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_menu_item.xml b/termux-app/nobicode/src/main/res/layout/dialog_menu_item.xml
+new file mode 100644
+index 0000000..c157b64
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_menu_item.xml
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="48dp"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:paddingStart="16dp"
++    android:paddingEnd="16dp"
++    android:background="?attr/selectableItemBackground">
++
++    <ImageView
++        android:id="@+id/menuItemIcon"
++        android:layout_width="22dp"
++        android:layout_height="22dp"
++        android:scaleType="fitCenter"
++        app:tint="?attr/colorOnSurface" />
++
++    <TextView
++        android:id="@+id/menuItemText"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:layout_marginStart="16dp"
++        android:textSize="15sp"
++        android:textColor="?attr/colorOnSurface" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_quick_open.xml b/termux-app/nobicode/src/main/res/layout/dialog_quick_open.xml
+new file mode 100644
+index 0000000..8c8940c
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_quick_open.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="16dp">
++
++    <EditText
++        android:id="@+id/quickOpenSearch"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="Type file name..."
++        android:singleLine="true"
++        android:imeOptions="actionSearch"
++        android:importantForAutofill="no" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/quickOpenList"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:maxHeight="340dp"
++        android:layout_marginTop="8dp" />
++
++    <TextView
++        android:id="@+id/quickOpenEmpty"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="16dp"
++        android:gravity="center"
++        android:text="Indexing files..."
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_quick_switcher.xml b/termux-app/nobicode/src/main/res/layout/dialog_quick_switcher.xml
+new file mode 100644
+index 0000000..b7d93c8
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_quick_switcher.xml
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="16dp"
++    android:background="@color/surface">
++
++    <EditText
++        android:id="@+id/qsSearch"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="Type to filter files..."
++        android:imeOptions="actionDone"
++        android:inputType="text"
++        android:background="@drawable/bg_search_box"
++        android:padding="12dp"
++        android:textColor="@color/on_surface"
++        android:textColorHint="@color/on_surface_variant" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/qsList"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:maxHeight="400dp"
++        android:layout_marginTop="8dp" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_remote_edit.xml b/termux-app/nobicode/src/main/res/layout/dialog_remote_edit.xml
+new file mode 100644
+index 0000000..128d12a
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_remote_edit.xml
+@@ -0,0 +1,76 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="8dp">
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="Name">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/reName"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <Spinner
++        android:id="@+id/reProtocol"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp" />
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="Host">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/reHost"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="textUri" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="Port">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/rePort"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="number" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="Username">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/reUser"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="Password">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/rePass"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:inputType="textPassword" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_search_files.xml b/termux-app/nobicode/src/main/res/layout/dialog_search_files.xml
+new file mode 100644
+index 0000000..d98923f
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_search_files.xml
+@@ -0,0 +1,96 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="16dp">
++
++    <EditText
++        android:id="@+id/searchFilesInput"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:hint="Search in files..."
++        android:singleLine="true"
++        android:imeOptions="actionSearch"
++        android:importantForAutofill="no" />
++
++    <EditText
++        android:id="@+id/replaceFilesInput"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:hint="Replace with..."
++        android:singleLine="true"
++        android:imeOptions="actionDone"
++        android:importantForAutofill="no" />
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:orientation="horizontal">
++
++        <com.google.android.material.checkbox.MaterialCheckBox
++            android:id="@+id/sfCase"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/opt_case"
++            android:textSize="13sp" />
++
++        <com.google.android.material.checkbox.MaterialCheckBox
++            android:id="@+id/sfWord"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="12dp"
++            android:text="@string/opt_word"
++            android:textSize="13sp" />
++
++    </LinearLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="4dp"
++        android:orientation="horizontal">
++
++        <com.google.android.material.checkbox.MaterialCheckBox
++            android:id="@+id/sfRegex"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/opt_regex"
++            android:textSize="13sp" />
++
++    </LinearLayout>
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/searchFilesList"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:maxHeight="340dp"
++        android:layout_marginTop="8dp" />
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="12dp"
++        android:gravity="center_vertical"
++        android:orientation="horizontal">
++
++        <TextView
++            android:id="@+id/searchFilesEmpty"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:text="Type and press search"
++            android:textColor="?attr/colorOnSurfaceVariant" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/replaceAllFilesBtn"
++            style="@style/Widget.Material3.Button.TonalButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/replace_all" />
++
++    </LinearLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_slider.xml b/termux-app/nobicode/src/main/res/layout/dialog_slider.xml
+new file mode 100644
+index 0000000..6de8f33
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_slider.xml
+@@ -0,0 +1,24 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="24dp">
++
++    <TextView
++        android:id="@+id/valueText"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_gravity="center_horizontal"
++        android:text="14 sp"
++        android:textSize="24sp"
++        android:textColor="@color/primary"
++        android:textStyle="bold"
++        android:layout_marginBottom="16dp" />
++
++    <SeekBar
++        android:id="@+id/slider"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:max="30" />
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_web_preview.xml b/termux-app/nobicode/src/main/res/layout/dialog_web_preview.xml
+new file mode 100644
+index 0000000..c67d8f4
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_web_preview.xml
+@@ -0,0 +1,98 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:orientation="vertical"
++    android:background="?attr/colorSurface">
++
++    <LinearLayout
++        android:id="@+id/browserHeader"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:minHeight="56dp"
++        android:gravity="center_vertical"
++        android:paddingStart="4dp"
++        android:paddingEnd="8dp"
++        android:paddingTop="6dp"
++        android:paddingBottom="6dp"
++        android:background="?attr/colorSurfaceContainerLow">
++
++        <ImageView
++            android:id="@+id/previewClose"
++            android:layout_width="40dp"
++            android:layout_height="40dp"
++            android:padding="10dp"
++            android:src="@drawable/ic_close"
++            android:background="?attr/selectableItemBackgroundBorderless"
++            app:tint="?attr/colorOnSurface"
++            android:contentDescription="Close" />
++
++        <LinearLayout
++            android:layout_width="0dp"
++            android:layout_height="38dp"
++            android:layout_weight="1"
++            android:layout_marginStart="4dp"
++            android:layout_marginEnd="4dp"
++            android:orientation="horizontal"
++            android:gravity="center_vertical"
++            android:paddingStart="12dp"
++            android:paddingEnd="4dp"
++            android:background="@drawable/bg_url_bar">
++
++            <ImageView
++                android:layout_width="16dp"
++                android:layout_height="16dp"
++                android:src="@drawable/ic_lock" />
++
++            <TextView
++                android:id="@+id/previewUrlText"
++                android:layout_width="0dp"
++                android:layout_height="wrap_content"
++                android:layout_weight="1"
++                android:layout_marginStart="8dp"
++                android:layout_marginEnd="4dp"
++                android:singleLine="true"
++                android:ellipsize="middle"
++                android:textSize="11.5sp"
++                android:fontFamily="monospace"
++                android:textColor="?attr/colorOnSurface" />
++
++            <ImageView
++                android:id="@+id/previewReload"
++                android:layout_width="28dp"
++                android:layout_height="28dp"
++                android:padding="5dp"
++                android:src="@drawable/ic_refresh"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                app:tint="?attr/colorOnSurfaceVariant"
++                android:contentDescription="Reload" />
++
++            <ImageView
++                android:id="@+id/previewMenuBtn"
++                android:layout_width="28dp"
++                android:layout_height="28dp"
++                android:padding="5dp"
++                android:src="@drawable/ic_more_vert"
++                android:background="?attr/selectableItemBackgroundBorderless"
++                app:tint="?attr/colorOnSurfaceVariant"
++                android:contentDescription="Browser Options" />
++
++        </LinearLayout>
++
++    </LinearLayout>
++
++    <View
++        android:layout_width="match_parent"
++        android:layout_height="1dp"
++        android:background="?attr/colorOutlineVariant"
++        android:alpha="0.4" />
++
++    <WebView
++        android:id="@+id/previewWebView"
++        android:layout_width="match_parent"
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        android:background="#FFFFFF" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/dialog_xml_preview.xml b/termux-app/nobicode/src/main/res/layout/dialog_xml_preview.xml
+new file mode 100644
+index 0000000..1f26b17
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/dialog_xml_preview.xml
+@@ -0,0 +1,91 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:background="?attr/colorSurface"
++    android:paddingBottom="24dp">
++
++    <!-- Top Bar -->
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="52dp"
++        android:gravity="center_vertical"
++        android:paddingStart="16dp"
++        android:paddingEnd="12dp"
++        android:background="?attr/colorSurfaceContainerLow">
++
++        <ImageView
++            android:layout_width="22dp"
++            android:layout_height="22dp"
++            android:src="@drawable/file_type_android" />
++
++        <TextView
++            android:id="@+id/xmlPreviewTitle"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:layout_marginStart="12dp"
++            android:text="XML Vector Preview"
++            android:textStyle="bold"
++            android:textSize="15sp"
++            android:textColor="?attr/colorOnSurface" />
++
++        <ImageView
++            android:id="@+id/xmlPreviewClose"
++            android:layout_width="36dp"
++            android:layout_height="36dp"
++            android:padding="8dp"
++            android:src="@drawable/ic_close"
++            android:background="?attr/selectableItemBackgroundBorderless"
++            app:tint="?attr/colorOnSurfaceVariant"
++            android:contentDescription="Close" />
++
++    </LinearLayout>
++
++    <View
++        android:layout_width="match_parent"
++        android:layout_height="1dp"
++        android:background="?attr/colorOutlineVariant"
++        android:alpha="0.4" />
++
++    <!-- Checkerboard Card Container for Vector Rendering -->
++    <com.google.android.material.card.MaterialCardView
++        style="@style/Widget.Material3.CardView.Filled"
++        android:layout_width="match_parent"
++        android:layout_height="280dp"
++        android:layout_marginStart="16dp"
++        android:layout_marginEnd="16dp"
++        android:layout_marginTop="16dp"
++        app:cardCornerRadius="16dp"
++        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
++
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="match_parent">
++
++            <!-- Scaled Vector Render View -->
++            <ImageView
++                android:id="@+id/xmlVectorImageView"
++                android:layout_width="160dp"
++                android:layout_height="160dp"
++                android:layout_gravity="center"
++                android:scaleType="fitCenter" />
++
++            <TextView
++                android:id="@+id/xmlPreviewInfo"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_gravity="bottom"
++                android:gravity="center"
++                android:padding="12dp"
++                android:textSize="12sp"
++                android:fontFamily="monospace"
++                android:textColor="?attr/colorOnSurfaceVariant" />
++
++        </FrameLayout>
++
++    </com.google.android.material.card.MaterialCardView>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_browser_file.xml b/termux-app/nobicode/src/main/res/layout/item_browser_file.xml
+new file mode 100644
+index 0000000..98ca1ae
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_browser_file.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:padding="12dp"
++    android:background="?attr/selectableItemBackground">
++
++    <ImageView
++        android:id="@+id/bfIcon"
++        android:layout_width="28dp"
++        android:layout_height="28dp"
++        android:layout_marginEnd="12dp" />
++
++    <TextView
++        android:id="@+id/bfName"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:textColor="@color/on_surface"
++        android:textSize="15sp"
++        android:maxLines="1"
++        android:ellipsize="middle" />
++
++    <ImageView
++        android:id="@+id/bfArrow"
++        android:layout_width="20dp"
++        android:layout_height="20dp"
++        android:src="@drawable/ic_chevron_right"
++        android:visibility="gone" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_command.xml b/termux-app/nobicode/src/main/res/layout/item_command.xml
+new file mode 100644
+index 0000000..1a62a4b
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_command.xml
+@@ -0,0 +1,40 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:background="?attr/selectableItemBackground"
++    android:paddingHorizontal="12dp"
++    android:paddingVertical="10dp">
++
++    <ImageView
++        android:id="@+id/cmdIcon"
++        android:layout_width="24dp"
++        android:layout_height="24dp"
++        android:tint="?attr/colorPrimary" />
++
++    <LinearLayout
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:layout_marginStart="12dp"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@+id/cmdTitle"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:textSize="15sp"
++            android:textColor="?attr/colorOnSurface" />
++
++        <TextView
++            android:id="@+id/cmdHint"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:textSize="12sp"
++            android:textColor="?attr/colorOnSurfaceVariant" />
++
++    </LinearLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_file_row.xml b/termux-app/nobicode/src/main/res/layout/item_file_row.xml
+new file mode 100644
+index 0000000..0089517
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_file_row.xml
+@@ -0,0 +1,42 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:minHeight="52dp"
++    android:paddingStart="18dp"
++    android:paddingEnd="14dp"
++    android:paddingTop="7dp"
++    android:paddingBottom="7dp"
++    android:background="?attr/selectableItemBackground">
++
++    <ImageView
++        android:id="@+id/fileIcon"
++        android:layout_width="26dp"
++        android:layout_height="26dp"
++        android:scaleType="fitCenter" />
++
++    <TextView
++        android:id="@+id/fileName"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:layout_marginStart="14dp"
++        android:layout_marginEnd="10dp"
++        android:textSize="14sp"
++        android:singleLine="true"
++        android:ellipsize="middle"
++        android:textColor="?attr/colorOnSurface" />
++
++    <ImageView
++        android:id="@+id/folderArrow"
++        android:layout_width="18dp"
++        android:layout_height="18dp"
++        android:src="@drawable/ic_chevron_right"
++        android:visibility="gone"
++        app:tint="?attr/colorOnSurfaceVariant"
++        android:alpha="0.7" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_git_change.xml b/termux-app/nobicode/src/main/res/layout/item_git_change.xml
+new file mode 100644
+index 0000000..394b175
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_git_change.xml
+@@ -0,0 +1,34 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:paddingTop="7dp"
++    android:paddingBottom="7dp"
++    android:paddingStart="4dp"
++    android:paddingEnd="4dp">
++
++    <TextView
++        android:id="@+id/changeBadge"
++        android:layout_width="26dp"
++        android:layout_height="26dp"
++        android:gravity="center"
++        android:text="M"
++        android:textSize="13sp"
++        android:textStyle="bold"
++        android:textColor="@android:color/white"
++        android:background="@drawable/bg_chip" />
++
++    <TextView
++        android:id="@+id/changePath"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:layout_marginStart="12dp"
++        android:textSize="13sp"
++        android:singleLine="true"
++        android:ellipsize="middle"
++        android:textColor="?attr/colorOnSurface" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_project.xml b/termux-app/nobicode/src/main/res/layout/item_project.xml
+new file mode 100644
+index 0000000..1ecac0b
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_project.xml
+@@ -0,0 +1,56 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:padding="12dp"
++    android:layout_margin="4dp"
++    android:background="@drawable/bg_project_card">
++
++    <ImageView
++        android:layout_width="32dp"
++        android:layout_height="32dp"
++        android:src="@drawable/ic_folder_open"
++        android:layout_marginEnd="12dp" />
++
++    <LinearLayout
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@+id/projName"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textColor="@color/on_surface"
++            android:textSize="14sp" />
++
++        <TextView
++            android:id="@+id/projPath"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textColor="@color/on_surface_variant"
++            android:textSize="12sp"
++            android:maxLines="1"
++            android:ellipsize="middle" />
++
++        <TextView
++            android:id="@+id/projLastOpened"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="4dp"
++            android:textColor="@color/on_surface_variant"
++            android:textSize="11sp" />
++
++    </LinearLayout>
++
++    <ImageView
++        android:id="@+id/projMenu"
++        android:layout_width="24dp"
++        android:layout_height="24dp"
++        android:src="@drawable/ic_more_vert"
++        android:padding="4dp" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_quick_open.xml b/termux-app/nobicode/src/main/res/layout/item_quick_open.xml
+new file mode 100644
+index 0000000..40e1dcd
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_quick_open.xml
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:background="?attr/selectableItemBackground"
++    android:paddingHorizontal="12dp"
++    android:paddingVertical="10dp">
++
++    <TextView
++        android:id="@+id/qoName"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:textSize="15sp"
++        android:textColor="?attr/colorOnSurface" />
++
++    <TextView
++        android:id="@+id/qoPath"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:singleLine="true"
++        android:ellipsize="middle"
++        android:textSize="12sp"
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_quick_switcher.xml b/termux-app/nobicode/src/main/res/layout/item_quick_switcher.xml
+new file mode 100644
+index 0000000..736ac22
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_quick_switcher.xml
+@@ -0,0 +1,51 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:padding="12dp"
++    android:background="?attr/selectableItemBackground">
++
++    <ImageView
++        android:id="@+id/qsIcon"
++        android:layout_width="24dp"
++        android:layout_height="24dp"
++        android:layout_marginEnd="12dp" />
++
++    <LinearLayout
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@+id/qsName"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textColor="@color/on_surface"
++            android:textSize="15sp" />
++
++        <TextView
++            android:id="@+id/qsPath"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textColor="@color/on_surface_variant"
++            android:textSize="12sp"
++            android:maxLines="1"
++            android:ellipsize="middle" />
++
++    </LinearLayout>
++
++    <TextView
++        android:id="@+id/qsBadge"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:text="OPEN"
++        android:textSize="10sp"
++        android:textColor="@color/primary"
++        android:visibility="gone"
++        android:background="@drawable/bg_badge"
++        android:padding="4dp" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_remote_conn.xml b/termux-app/nobicode/src/main/res/layout/item_remote_conn.xml
+new file mode 100644
+index 0000000..fe77263
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_remote_conn.xml
+@@ -0,0 +1,59 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="horizontal"
++    android:gravity="center_vertical"
++    android:minHeight="60dp"
++    android:paddingStart="8dp"
++    android:paddingEnd="4dp"
++    android:paddingTop="8dp"
++    android:paddingBottom="8dp"
++    android:background="?attr/selectableItemBackground">
++
++    <ImageView
++        android:layout_width="30dp"
++        android:layout_height="30dp"
++        android:src="@drawable/ic_server"
++        app:tint="?attr/colorPrimary" />
++
++    <LinearLayout
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:layout_marginStart="12dp"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@+id/connName"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textSize="14sp"
++            android:textStyle="bold"
++            android:textColor="?attr/colorOnSurface" />
++
++        <TextView
++            android:id="@+id/connDetail"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textSize="12sp"
++            android:textColor="?attr/colorOnSurfaceVariant" />
++    </LinearLayout>
++
++    <TextView
++        android:id="@+id/connActiveBadge"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginEnd="8dp"
++        android:background="@drawable/bg_chip"
++        android:paddingStart="10dp"
++        android:paddingEnd="10dp"
++        android:paddingTop="4dp"
++        android:paddingBottom="4dp"
++        android:text="Active"
++        android:textSize="11sp"
++        android:textColor="?attr/colorPrimary"
++        android:visibility="gone" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_search_result.xml b/termux-app/nobicode/src/main/res/layout/item_search_result.xml
+new file mode 100644
+index 0000000..79ccb90
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_search_result.xml
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:background="?attr/selectableItemBackground"
++    android:paddingHorizontal="12dp"
++    android:paddingVertical="10dp">
++
++    <TextView
++        android:id="@+id/srFile"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:textSize="15sp"
++        android:textColor="?attr/colorOnSurface" />
++
++    <TextView
++        android:id="@+id/srDetail"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:singleLine="true"
++        android:ellipsize="middle"
++        android:textSize="12sp"
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++    <TextView
++        android:id="@+id/srSnippet"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:singleLine="true"
++        android:ellipsize="start"
++        android:textSize="13sp"
++        android:fontFamily="monospace"
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/item_tab.xml b/termux-app/nobicode/src/main/res/layout/item_tab.xml
+new file mode 100644
+index 0000000..ece401f
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/item_tab.xml
+@@ -0,0 +1,76 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="wrap_content"
++    android:layout_height="46dp"
++    android:orientation="vertical">
++
++    <!-- Active tab indicator (VS Code style top bar) -->
++    <View
++        android:id="@+id/tabIndicator"
++        android:layout_width="match_parent"
++        android:layout_height="3dp"
++        android:layout_marginStart="10dp"
++        android:layout_marginEnd="10dp"
++        android:background="@drawable/bg_tab_indicator"
++        android:visibility="gone" />
++
++    <LinearLayout
++        android:id="@+id/tabRow"
++        android:layout_width="wrap_content"
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        android:orientation="horizontal"
++        android:gravity="center_vertical"
++        android:paddingStart="12dp"
++        android:paddingEnd="6dp"
++        android:layout_marginEnd="6dp">
++
++        <ImageView
++            android:id="@+id/tabIcon"
++            android:layout_width="18dp"
++            android:layout_height="18dp"
++            android:scaleType="fitCenter" />
++
++        <TextView
++            android:id="@+id/tabTitle"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="8dp"
++            android:maxWidth="140dp"
++            android:singleLine="true"
++            android:ellipsize="middle"
++            android:textSize="12sp"
++            android:textColor="?attr/colorOnSurface" />
++
++        <!-- Unsaved-changes dot (shows alongside × when modified) -->
++        <View
++            android:id="@+id/tabModifiedDot"
++            android:layout_width="8dp"
++            android:layout_height="8dp"
++            android:layout_marginStart="8dp"
++            android:background="@drawable/bg_dot"
++            android:visibility="gone" />
++
++        <ImageView
++            android:id="@+id/tabPin"
++            android:layout_width="12dp"
++            android:layout_height="12dp"
++            android:layout_marginStart="6dp"
++            android:src="@drawable/ic_pin"
++            android:visibility="gone" />
++
++        <ImageView
++            android:id="@+id/tabClose"
++            android:layout_width="28dp"
++            android:layout_height="28dp"
++            android:layout_marginStart="4dp"
++            android:padding="7dp"
++            android:src="@drawable/ic_close"
++            android:background="?attr/selectableItemBackgroundBorderless"
++            app:tint="?attr/colorOnSurfaceVariant"
++            android:contentDescription="@string/cd_close" />
++
++    </LinearLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml b/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
+new file mode 100644
+index 0000000..f1cd4e2
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
+@@ -0,0 +1,1376 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:orientation="vertical"
++    android:background="?attr/colorSurface">
++
++    <com.google.android.material.appbar.MaterialToolbar
++        android:id="@+id/settingsToolbar"
++        android:layout_width="match_parent"
++        android:layout_height="?attr/actionBarSize"
++        android:background="?attr/colorSurface"
++        app:title="Settings"
++        app:navigationIcon="@drawable/ic_arrow_back" />
++
++    <ImageView
++        android:layout_width="match_parent"
++        android:layout_height="64dp"
++        android:layout_marginStart="16dp"
++        android:layout_marginEnd="16dp"
++        android:layout_marginTop="8dp"
++        android:src="@drawable/img_settings_strip"
++        android:scaleType="centerCrop" />
++
++    <EditText
++        android:id="@+id/settingsSearch"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginStart="20dp"
++        android:layout_marginEnd="16dp"
++        android:layout_marginTop="4dp"
++        android:hint="Search settings"
++        android:singleLine="true"
++        android:imeOptions="actionSearch"
++        android:importantForAutofill="no" />
++
++    <ScrollView
++        android:layout_width="match_parent"
++        android:layout_height="match_parent">
++
++        <LinearLayout
++            android:id="@+id/settingsContainer"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:orientation="vertical"
++            android:paddingBottom="24dp">
++
++            <!-- Appearance -->
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:paddingStart="20dp"
++                android:paddingTop="16dp"
++                android:paddingBottom="8dp"
++                android:text="Appearance"
++                android:textColor="@color/primary"
++                android:textSize="13sp"
++                android:textStyle="bold" />
++
++            <LinearLayout
++                android:id="@+id/rowTheme"
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_palette"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Theme"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:id="@+id/themeSubtitle"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Tokyo Night"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:id="@+id/rowFontSize"
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_text_size"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Font size"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:id="@+id/fontSizeSubtitle"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="14 sp"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
++            </LinearLayout>
++
++            <!-- Editor -->
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:paddingStart="20dp"
++                android:paddingTop="16dp"
++                android:paddingBottom="8dp"
++                android:text="Editor"
++                android:textColor="@color/primary"
++                android:textSize="13sp"
++                android:textStyle="bold" />
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_wrap"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Word wrap"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Wrap long lines"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchWordWrap"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_numbers"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Line numbers"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Show gutter line numbers"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchLineNumbers"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_fold"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Code folding"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Collapse functions and blocks"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchFolding"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_sticky"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Sticky scroll"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Pin current function header on top"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchStickyScroll"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_minimap"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Minimap"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Zoomed-out code overview on the right"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchMinimap"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_line_highlight"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Highlight current line"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Subtle background on the cursor line"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchHighlightLine"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_indent_guides"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Indent guides"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Show vertical indent level lines"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchIndentGuides"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_trim"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Trim trailing whitespace"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Clean line ends on save"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchTrimWhitespace"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_paste_indent"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Auto-indent on paste"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Match indent when pasting"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchAutoIndentPaste"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_text_size"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Font ligatures"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Render -&gt;, =&gt;, != as single symbols"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchFontLigatures"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:id="@+id/rowLineSpacing"
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_text_size"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Line spacing"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:id="@+id/lineSpacingSubtitle"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="100%"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_keep_screen"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Keep screen on"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Prevent screen timeout while editing"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchKeepScreenOn"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_typewriter"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Typewriter mode"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Keep the caret line centered"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchTypewriterMode"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_code"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Symbols bar"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Extra symbol keys above the footer"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchSymbolsBar"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_whitespace"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Show whitespace"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Show spaces and tabs as marks"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchShowWhitespace"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_symbol"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Rainbow brackets"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Color nested brackets by depth"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchRainbowBrackets"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_brackets"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Auto-close brackets"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Insert closing bracket automatically"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchAutoClose"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:id="@+id/rowTabSize"
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_tab"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Tab size"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:id="@+id/tabSizeSubtitle"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="4 Spaces"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:id="@+id/rowLineGuide"
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_ruler"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Line length guide"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:id="@+id/lineGuideSubtitle"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Off"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_code"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Syntax highlighting"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Colorize keywords, strings and comments"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchSyntaxHighlight"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_indent_in"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Auto-indent"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Indent new lines automatically"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchAutoIndent"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_zoom"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Pinch to zoom"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Two-finger gesture changes font size"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchPinchZoom"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_lang_web"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Emmet"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Expand abbreviations with Tab in HTML/XML"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchEmmet"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <!-- Files -->
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:paddingStart="20dp"
++                android:paddingTop="16dp"
++                android:paddingBottom="8dp"
++                android:text="Files"
++                android:textColor="@color/primary"
++                android:textSize="13sp"
++                android:textStyle="bold" />
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_save"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Auto-save"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Save files automatically"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchAutoSave"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_visibility"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Hide hidden files"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Hide files starting with a dot"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchHideHiddenFiles"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_text_size"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Insert final newline"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="End files with a newline on save"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchInsertFinalNewline"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_lock"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Read-only"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Prevent editing files"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchReadOnly"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/btnResetSettings"
++                style="@style/Widget.Material3.Button.OutlinedButton"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_margin="20dp"
++                android:text="Reset settings to defaults" />
++
++            <TextView
++                android:id="@+id/versionText"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_gravity="center_horizontal"
++                android:layout_marginBottom="24dp"
++                android:text="v1.0"
++                android:textSize="12sp"
++                android:textColor="?attr/colorOnSurfaceVariant" />
++
++        </LinearLayout>
++    </ScrollView>
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/sheet_git.xml b/termux-app/nobicode/src/main/res/layout/sheet_git.xml
+new file mode 100644
+index 0000000..4909834
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/sheet_git.xml
+@@ -0,0 +1,149 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="20dp">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="center_vertical">
++
++        <TextView
++            android:id="@+id/gitRepoName"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:text="Source Control"
++            android:textSize="18sp"
++            android:textStyle="bold"
++            android:textColor="?attr/colorOnSurface" />
++
++        <TextView
++            android:id="@+id/gitBranchChip"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:background="@drawable/bg_chip"
++            android:paddingStart="12dp"
++            android:paddingEnd="12dp"
++            android:paddingTop="6dp"
++            android:paddingBottom="6dp"
++            android:text="main"
++            android:textSize="13sp"
++            android:textColor="?attr/colorPrimary" />
++    </LinearLayout>
++
++    <TextView
++        android:id="@+id/gitChangesLabel"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="16dp"
++        android:text="Changes"
++        android:textSize="14sp"
++        android:textStyle="bold"
++        android:textColor="?attr/colorOnSurface" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/gitChangesList"
++        android:layout_width="match_parent"
++        android:layout_height="180dp"
++        android:layout_marginTop="8dp" />
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="12dp"
++        android:hint="Commit message">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/gitCommitMsg"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <com.google.android.material.checkbox.MaterialCheckBox
++        android:id="@+id/gitAmendCheck"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="4dp"
++        android:text="Amend last commit"
++        android:textSize="14sp" />
++
++    <com.google.android.material.button.MaterialButton
++        android:id="@+id/gitCommitBtn"
++        style="@style/Widget.Material3.Button"
++        android:layout_width="match_parent"
++        android:layout_height="48dp"
++        android:layout_marginTop="8dp"
++        android:text="Commit"
++        app:cornerRadius="12dp" />
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:orientation="horizontal">
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/gitPullBtn"
++            style="@style/Widget.Material3.Button.TonalButton"
++            android:layout_width="0dp"
++            android:layout_height="44dp"
++            android:layout_weight="1"
++            android:text="Pull" />
++
++        <Space
++            android:layout_width="8dp"
++            android:layout_height="wrap_content" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/gitPushBtn"
++            style="@style/Widget.Material3.Button.TonalButton"
++            android:layout_width="0dp"
++            android:layout_height="44dp"
++            android:layout_weight="1"
++            android:text="Push" />
++    </LinearLayout>
++
++    <LinearLayout
++        android:id="@+id/gitCloneSection"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="vertical"
++        android:visibility="gone">
++
++        <TextView
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="8dp"
++            android:text="Not a Git repository"
++            android:textSize="14sp"
++            android:textColor="?attr/colorOnSurfaceVariant" />
++
++        <com.google.android.material.textfield.TextInputLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="8dp"
++            android:hint="Repository URL (https://...)">
++
++            <com.google.android.material.textfield.TextInputEditText
++                android:id="@+id/gitCloneUrl"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:inputType="textUri" />
++        </com.google.android.material.textfield.TextInputLayout>
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/gitCloneBtn"
++            style="@style/Widget.Material3.Button"
++            android:layout_width="match_parent"
++            android:layout_height="48dp"
++            android:layout_marginTop="8dp"
++            android:text="Clone here"
++            app:cornerRadius="12dp" />
++    </LinearLayout>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/sheet_remote.xml b/termux-app/nobicode/src/main/res/layout/sheet_remote.xml
+new file mode 100644
+index 0000000..3cbb240
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/sheet_remote.xml
+@@ -0,0 +1,52 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="20dp">
++
++    <TextView
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:text="Remote Servers"
++        android:textSize="18sp"
++        android:textStyle="bold"
++        android:textColor="?attr/colorOnSurface" />
++
++    <TextView
++        android:id="@+id/remoteStatusText"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="4dp"
++        android:text="Not connected"
++        android:textSize="13sp"
++        android:textColor="?attr/colorOnSurfaceVariant" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/remoteConnList"
++        android:layout_width="match_parent"
++        android:layout_height="220dp"
++        android:layout_marginTop="12dp" />
++
++    <com.google.android.material.button.MaterialButton
++        android:id="@+id/remoteAddBtn"
++        style="@style/Widget.Material3.Button.TonalButton"
++        android:layout_width="match_parent"
++        android:layout_height="48dp"
++        android:layout_marginTop="8dp"
++        android:text="Add Connection"
++        app:icon="@drawable/ic_add"
++        app:cornerRadius="12dp" />
++
++    <com.google.android.material.button.MaterialButton
++        android:id="@+id/remoteDisconnectBtn"
++        style="@style/Widget.Material3.Button.OutlinedButton"
++        android:layout_width="match_parent"
++        android:layout_height="48dp"
++        android:layout_marginTop="8dp"
++        android:text="Disconnect"
++        android:visibility="gone"
++        app:cornerRadius="12dp" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/sheet_theme_item.xml b/termux-app/nobicode/src/main/res/layout/sheet_theme_item.xml
+new file mode 100644
+index 0000000..af98623
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/sheet_theme_item.xml
+@@ -0,0 +1,45 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="14dp"
++    android:layout_marginStart="16dp"
++    android:layout_marginEnd="16dp"
++    android:layout_marginTop="6dp"
++    android:layout_marginBottom="6dp"
++    android:background="@drawable/bg_theme_card">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="center_vertical">
++
++        <TextView
++            android:id="@+id/themeName"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:textSize="14sp"
++            android:textStyle="bold" />
++
++        <ImageView
++            android:id="@+id/themeCheck"
++            android:layout_width="20dp"
++            android:layout_height="20dp"
++            android:src="@drawable/ic_check"
++            android:visibility="gone" />
++
++    </LinearLayout>
++
++    <TextView
++        android:id="@+id/themeSample"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="6dp"
++        android:fontFamily="monospace"
++        android:textSize="11sp"
++        android:text="fun main() { println(&quot;hi&quot;) }" />
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/layout/sheet_theme_picker.xml b/termux-app/nobicode/src/main/res/layout/sheet_theme_picker.xml
+new file mode 100644
+index 0000000..326c228
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/layout/sheet_theme_picker.xml
+@@ -0,0 +1,32 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:paddingTop="16dp"
++    android:paddingBottom="24dp">
++
++    <TextView
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:paddingStart="20dp"
++        android:paddingEnd="20dp"
++        android:paddingBottom="12dp"
++        android:text="@string/theme_title"
++        android:textSize="18sp"
++        android:textStyle="bold"
++        android:textColor="?attr/colorOnSurface" />
++
++    <ScrollView
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content">
++
++        <LinearLayout
++            android:id="@+id/themeList"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:orientation="vertical" />
++
++    </ScrollView>
++
++</LinearLayout>
+diff --git a/termux-app/nobicode/src/main/res/menu/main_menu.xml b/termux-app/nobicode/src/main/res/menu/main_menu.xml
+new file mode 100644
+index 0000000..3206878
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/menu/main_menu.xml
+@@ -0,0 +1,75 @@
++<?xml version="1.0" encoding="utf-8"?>
++<menu xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto">
++
++    <!-- Toolbar icons (always visible) -->
++    <item
++        android:id="@+id/action_git"
++        android:title="Git"
++        android:icon="@drawable/ic_git_branch"
++        app:showAsAction="always" />
++
++    <!-- Dynamic Run / Preview Action next to 3-dots -->
++    <item
++        android:id="@+id/action_run"
++        android:title="Run / Preview"
++        android:icon="@drawable/ic_run"
++        app:showAsAction="always"
++        android:visible="false" />
++
++    <!-- 3-dot overflow: ONLY basics. Everything else lives in the command palette. -->
++    <item
++        android:id="@+id/action_open_file"
++        android:title="@string/action_open_file"
++        android:icon="@drawable/ic_folder_open"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_save"
++        android:title="@string/action_save"
++        android:icon="@drawable/ic_save"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_save_as"
++        android:title="@string/action_save_as"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_new"
++        android:title="@string/action_new"
++        android:icon="@drawable/ic_add"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_command_palette"
++        android:title="@string/action_command_palette"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_quick_switch"
++        android:title="Quick Switch"
++        android:icon="@drawable/ic_switch"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_terminal"
++        android:title="Terminal"
++        android:icon="@drawable/ic_terminal"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_goto"
++        android:title="@string/action_goto"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_markdown_preview"
++        android:title="@string/action_markdown_preview"
++        app:showAsAction="never" />
++
++    <item
++        android:id="@+id/action_settings"
++        android:title="@string/action_settings"
++        app:showAsAction="never" />
++</menu>
+diff --git a/termux-app/nobicode/src/main/res/menu/pm_menu.xml b/termux-app/nobicode/src/main/res/menu/pm_menu.xml
+new file mode 100644
+index 0000000..441e54c
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/menu/pm_menu.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<menu xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto">
++    <item
++        android:id="@+id/pm_add_folder"
++        android:title="Choose Folder"
++        android:icon="@drawable/ic_add"
++        app:showAsAction="always" />
++</menu>
+diff --git a/termux-app/nobicode/src/main/res/values/colors.xml b/termux-app/nobicode/src/main/res/values/colors.xml
+new file mode 100644
+index 0000000..84aee70
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/values/colors.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- Modern vivid violet primary -->
++    <color name="primary">#8B7CF6</color>
++    <color name="on_primary">#FFFFFF</color>
++    <color name="primary_container">#2B2456</color>
++    <color name="on_primary_container">#DCD6FF</color>
++
++    <!-- Deep modern surfaces -->
++    <color name="surface">#12131B</color>
++    <color name="on_surface">#E6E9F5</color>
++    <color name="surface_container_low">#0D0E14</color>
++    <color name="surface_container_high">#1F2230</color>
++    <color name="on_surface_variant">#8E94AD</color>
++
++    <color name="outline">#333948</color>
++    <color name="outline_variant">#222633</color>
++    <color name="accent_dot">#FF6B8A</color>
++
++    <!-- Editor gutter -->
++    <color name="gutter_bg">#0D0E14</color>
++    <color name="gutter_line">#3D435C</color>
++</resources>
+diff --git a/termux-app/nobicode/src/main/res/values/strings.xml b/termux-app/nobicode/src/main/res/values/strings.xml
+new file mode 100644
+index 0000000..023934a
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/values/strings.xml
+@@ -0,0 +1,120 @@
++<resources>
++    <string name="app_name">NobiCode</string>
++    <string name="action_open_file">Open File…</string>
++    <string name="action_new">New File</string>
++    <string name="action_save">Save</string>
++    <string name="action_save_as">Save As…</string>
++    <string name="action_goto">Go to Line…</string>
++    <string name="action_color_picker">Pick color</string>
++    <string name="action_toggle_comment">Toggle comment</string>
++    <string name="action_duplicate_line">Duplicate line</string>
++    <string name="action_quick_open">Quick Open...</string>
++    <string name="action_live_preview">Live Preview</string>
++    <string name="action_move_line_up">Move line up</string>
++    <string name="action_move_line_down">Move line down</string>
++    <string name="action_join_lines">Join lines</string>
++    <string name="action_delete_line">Delete line</string>
++    <string name="action_go_to_symbol">Go to symbol</string>
++    <string name="action_search_files">Search in files</string>
++    <string name="action_doc_stats">Document stats</string>
++    <string name="action_indent_increase">Increase indent</string>
++    <string name="action_indent_decrease">Decrease indent</string>
++    <string name="action_select_bracket">Select to matching bracket</string>
++    <string name="action_jump_bracket">Jump to matching bracket</string>
++    <string name="action_matching_tag">Select to matching tag</string>
++    <string name="action_last_edit">Go to last edit</string>
++    <string name="action_toggle_bookmark">Toggle bookmark</string>
++    <string name="action_next_bookmark">Next bookmark</string>
++    <string name="action_clear_bookmarks">Clear bookmarks</string>
++    <string name="action_next_empty_line">Next empty line</string>
++    <string name="action_prev_empty_line">Previous empty line</string>
++    <string name="action_insert_line_above">Insert line above</string>
++    <string name="action_insert_line_below">Insert line below</string>
++    <string name="action_sort_asc">Sort lines A–Z</string>
++    <string name="action_sort_desc">Sort lines Z–A</string>
++    <string name="action_dedup_lines">Remove duplicate lines</string>
++    <string name="action_reverse_lines">Reverse lines</string>
++    <string name="action_tabs_to_spaces">Tabs to spaces</string>
++    <string name="action_spaces_to_tabs">Spaces to tabs</string>
++    <string name="action_convert_lf">Convert to LF</string>
++    <string name="action_convert_crlf">Convert to CRLF</string>
++    <string name="action_remove_blank_lines">Remove blank lines</string>
++    <string name="action_reopen_tab">Reopen closed tab</string>
++    <string name="action_close_other_tabs">Close other tabs</string>
++    <string name="action_close_tabs_right">Close tabs to the right</string>
++    <string name="action_close_all_tabs">Close all tabs</string>
++    <string name="no_open_tabs">No open tabs</string>
++    <string name="no_tabs_to_right">No tabs to the right</string>
++    <string name="action_move_tab_left">Move tab left</string>
++    <string name="action_move_tab_right">Move tab right</string>
++    <string name="action_share_file">Share file</string>
++    <string name="action_copy_path">Copy file path</string>
++    <string name="path_copied_to_clipboard">Path copied to clipboard</string>
++    <string name="no_file_open">No file open</string>
++    <string name="no_other_tabs">No other tabs open</string>
++    <string name="no_closed_tabs">No recently closed tabs</string>
++    <string name="action_select_next">Select next occurrence</string>
++    <string name="action_expand_selection">Expand selection</string>
++    <string name="action_toggle_case">Toggle case</string>
++    <string name="action_snake_camel">Convert snake \u21c4 camel</string>
++    <string name="action_select_string">Select string content</string>
++    <string name="action_rename_symbol">Rename symbol in file</string>
++    <string name="no_symbols_found">No symbols found</string>
++    <string name="color_picker_apply">Apply</string>
++    <string name="action_select_all">Select All</string>
++    <string name="action_paste">Paste</string>
++    <string name="action_clear_all">Clear All</string>
++    <string name="action_settings">Settings</string>
++    <string name="action_markdown_preview">Markdown Preview</string>
++    <string name="action_code_actions">Quick Code Actions</string>
++    <string name="action_format">Format Code</string>
++    <string name="action_xml_preview">Android XML Preview</string>
++    <string name="action_web_preview">Live Web Preview</string>
++    <string name="file_new">New</string>
++    <string name="file_new_file">New File</string>
++    <string name="file_new_folder">New Folder</string>
++    <string name="file_rename">Rename</string>
++    <string name="file_delete">Delete</string>
++    <string name="file_duplicate">Duplicate</string>
++    <string name="file_delete_confirm">Delete %s?</string>
++    <string name="file_name_hint">Name</string>
++    <string name="format_done">Code formatted</string>
++    <string name="format_failed">Could not format this file</string>
++    <string name="format_no_change">Already formatted</string>
++    <string name="drawer_empty">No folder selected</string>
++    <string name="drawer_pick">Choose Folder</string>
++    <string name="drawer_empty_title">No folder opened</string>
++    <string name="drawer_empty_hint">Choose a folder to browse, open and edit your code files.</string>
++    <string name="drawer_up">Up</string>
++    <string name="tab_untitled">Untitled</string>
++    <string name="saved">Saved successfully</string>
++    <string name="save_failed">Failed to save file</string>
++    <string name="unsaved_title">Unsaved Changes</string>
++    <string name="unsaved_msg">"%s has unsaved changes. Do you want to discard them?"</string>
++    <string name="discard">Discard</string>
++    <string name="cancel">Cancel</string>
++    <string name="no_match">No match found</string>
++    <string name="replaced_count">Replaced %d occurrences</string>
++    <string name="status_lang">Plain Text</string>
++    <string name="status_line">Ln 1, Col 1</string>
++    <string name="status_encoding">UTF-8</string>
++    <string name="cd_close">Close tab</string>
++    <string name="cd_refresh">Refresh tree</string>
++    <string name="find_hint">Find</string>
++    <string name="replace_hint">Replace with</string>
++    <string name="opt_regex">Regular expression</string>
++    <string name="opt_case">Match case</string>
++    <string name="opt_word">Whole word</string>
++    <string name="find_next">Find Next</string>
++    <string name="find_cursors">Cursors</string>
++    <string name="replace_one">Replace</string>
++    <string name="replace_all">Replace All</string>
++    <string name="goto_hint">Line number</string>
++    <string name="goto_action">Go</string>
++    <string name="theme_title">Editor Theme</string>
++    <string name="menu_find">Find &amp; Replace</string>
++    <string name="action_command_palette">Command Palette</string>
++    <string name="close">Close</string>
++    <string name="save">Save</string>
++    <string name="parent_folder">.. (Parent Folder)</string>
++</resources>
+diff --git a/termux-app/nobicode/src/main/res/values/themes.xml b/termux-app/nobicode/src/main/res/values/themes.xml
+new file mode 100644
+index 0000000..26594bc
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/values/themes.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <style name="Theme.NobiCode" parent="Theme.Material3.Dark.NoActionBar">
++        <item name="colorPrimary">@color/primary</item>
++        <item name="colorOnPrimary">@color/on_primary</item>
++        <item name="colorPrimaryContainer">@color/primary_container</item>
++        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
++        <item name="colorSurface">@color/surface</item>
++        <item name="colorOnSurface">@color/on_surface</item>
++        <item name="colorSurfaceContainerLow">@color/surface_container_low</item>
++        <item name="colorSurfaceContainerHigh">@color/surface_container_high</item>
++        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
++        <item name="colorOutlineVariant">@color/outline_variant</item>
++        <item name="android:statusBarColor">@color/surface_container_low</item>
++        <item name="android:navigationBarColor">@color/surface_container_low</item>
++    </style>
++
++    <!-- Fullscreen terminal theme - no status bar like Termux -->
++    <style name="Theme.Terminal.Fullscreen" parent="Theme.Material3.Dark.NoActionBar">
++        <item name="android:windowFullscreen">true</item>
++        <item name="android:windowContentOverlay">@null</item>
++    </style>
++</resources>
+diff --git a/termux-app/nobicode/src/main/res/xml/file_paths.xml b/termux-app/nobicode/src/main/res/xml/file_paths.xml
+new file mode 100644
+index 0000000..d65f344
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/xml/file_paths.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<paths>
++    <external-files-path name="external_files" path="." />
++    <files-path name="crash_logs" path="crash_logs/" />
++</paths>

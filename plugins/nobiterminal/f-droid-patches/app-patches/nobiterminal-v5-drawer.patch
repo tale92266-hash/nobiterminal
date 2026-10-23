@@ -1,0 +1,328 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+index 1cb4411..0c786ed 100644
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -395,6 +395,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+         mTermuxService = ((TermuxService.LocalBinder) service).service;
+ 
+         setTermuxSessionsListView();
++        setNobiDrawerMenuView();
+ 
+         final Intent intent = getIntent();
+         setIntent(null);
+@@ -504,6 +505,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+ 
+     private void setTermuxSessionsListView() {
+         ListView termuxSessionsListView = findViewById(R.id.terminal_sessions_list);
++        // v5: the drawer shows the app-style section menu instead of the
++        // sessions list (session switching lives in the tabs bar). The list
++        // and its controller stay wired but hidden.
++        termuxSessionsListView.setVisibility(View.GONE);
+         mTermuxSessionListViewController = new TermuxSessionsListViewController(this, mTermuxService.getTermuxSessions());
+         termuxSessionsListView.setAdapter(mTermuxSessionListViewController);
+         termuxSessionsListView.setOnItemClickListener(mTermuxSessionListViewController);
+@@ -513,6 +518,51 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+         mNobiTabsController.refreshTabs();
+     }
+ 
++    /**
++     * Wire the app-style navigation menu shown in the drawer (v5). Session
++     * switching lives in the tabs bar, so the drawer offers sections
++     * instead: Terminal, Nobi Code, New Session, Settings and Exit.
++     */
++    private void setNobiDrawerMenuView() {
++        View terminalItem = findViewById(R.id.nobi_menu_terminal);
++        if (terminalItem != null) {
++            terminalItem.setOnClickListener(v -> getDrawer().closeDrawers());
++        }
++
++        View nobiCodeItem = findViewById(R.id.nobi_menu_nobicode);
++        if (nobiCodeItem != null) {
++            nobiCodeItem.setOnClickListener(v -> {
++                getDrawer().closeDrawers();
++                ActivityUtils.startActivity(this, new Intent(this, com.nobidev.nobicode.MainActivity.class));
++            });
++        }
++
++        View newSessionItem = findViewById(R.id.nobi_menu_new_session);
++        if (newSessionItem != null) {
++            newSessionItem.setOnClickListener(v -> {
++                mTermuxTerminalSessionActivityClient.addNewSession(false, null);
++                getDrawer().closeDrawers();
++                if (mNobiTabsController != null) mNobiTabsController.refreshTabs();
++            });
++        }
++
++        View settingsItem = findViewById(R.id.nobi_menu_settings);
++        if (settingsItem != null) {
++            settingsItem.setOnClickListener(v ->
++                ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class)));
++        }
++
++        View exitItem = findViewById(R.id.nobi_menu_exit);
++        if (exitItem != null) {
++            exitItem.setOnClickListener(v -> {
++                Intent exitIntent = new Intent(this, TermuxService.class)
++                    .setAction(TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_STOP_SERVICE);
++                startService(exitIntent);
++                finish();
++            });
++        }
++    }
++
+ 
+ 
+     private void setTerminalToolbarView(Bundle savedInstanceState) {
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_code.xml b/termux-app/app/src/main/res/drawable/ic_nobi_code.xml
+new file mode 100644
+index 0000000..21e6139
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_code.xml
+@@ -0,0 +1,19 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++
++    <path
++        android:pathData="M9.41,7.07 L4.83,12 L9.41,16.93"
++        android:strokeColor="#FFFFFF"
++        android:strokeWidth="2"
++        android:fillColor="@android:color/transparent" />
++
++    <path
++        android:pathData="M14.59,7.07 L19.17,12 L14.59,16.93"
++        android:strokeColor="#FFFFFF"
++        android:strokeWidth="2"
++        android:fillColor="@android:color/transparent" />
++
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_exit.xml b/termux-app/app/src/main/res/drawable/ic_nobi_exit.xml
+new file mode 100644
+index 0000000..d8a3182
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_exit.xml
+@@ -0,0 +1,19 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++
++    <path
++        android:pathData="M12,3.5 L12,10.5"
++        android:strokeColor="#FFFFFF"
++        android:strokeWidth="2.2"
++        android:fillColor="@android:color/transparent" />
++
++    <path
++        android:pathData="M17.6,6.6 A7.6,7.6 0 1 1 6.4,6.6"
++        android:strokeColor="#FFFFFF"
++        android:strokeWidth="2.2"
++        android:fillColor="@android:color/transparent" />
++
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml b/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml
+new file mode 100644
+index 0000000..38ea413
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml
+@@ -0,0 +1,27 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:height="108dp"
++    android:width="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++
++    <path
++        android:fillColor="#FFFFFF"
++        android:pathData="M34,38
++                          h6
++                          l12,16
++                          l-12,16
++                          h-6
++                          l12,-16
++                          "
++        />
++
++    <path
++        android:fillColor="#FFFFFF"
++        android:pathData="M56,66
++                          h18
++                          v4
++                          h-18
++                          "
++        />
++
++</vector>
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+index 2eb3f30..ed84b41 100644
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -91,6 +91,151 @@
+                         app:tint="?attr/termuxActivityDrawerImageTint" />
+                 </LinearLayout>
+ 
++                <LinearLayout
++                    android:id="@+id/nobi_drawer_menu"
++                    android:layout_width="match_parent"
++                    android:layout_height="0dp"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingTop="8dp">
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_terminal"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_terminal"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_terminal"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_nobicode"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_code"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_nobicode"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_new_session"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_new_session"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_new_session"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_settings"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_settings"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_settings"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_exit"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_exit"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_exit"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                </LinearLayout>
++
+                 <ListView
+                     android:id="@+id/terminal_sessions_list"
+                     android:layout_width="match_parent"
+diff --git a/termux-app/app/src/main/res/values/nobi_drawer_strings.xml b/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
+new file mode 100644
+index 0000000..fb87bf6
+--- /dev/null
++++ b/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="nobi_menu_terminal">Terminal</string>
++    <string name="nobi_menu_nobicode">Nobi Code</string>
++    <string name="nobi_menu_new_session">New Session</string>
++    <string name="nobi_menu_settings">Settings</string>
++    <string name="nobi_menu_exit">Exit</string>
++</resources>
