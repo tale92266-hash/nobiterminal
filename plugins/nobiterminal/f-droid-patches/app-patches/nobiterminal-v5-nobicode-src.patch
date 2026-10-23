@@ -382,10 +382,10 @@ index 0000000..0e12423
 +}
 diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
 new file mode 100644
-index 0000000..a401454
+index 0000000..4388c25
 --- /dev/null
 +++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
-@@ -0,0 +1,12436 @@
+@@ -0,0 +1,12433 @@
 +package com.nobidev.nobicode
 +
 +import android.app.Dialog
@@ -7760,8 +7760,7 @@ index 0000000..a401454
 +            while (k < text.length) {
 +                if (maskedOnce[k] == ' ') { k++; continue }
 +                if (text[k] == '{') { bOpen = k; break }
-+                if (text[k] == '
-+' || text[k] == ';') break
++                if (text[k] == '\n' || text[k] == ';') break
 +                k++
 +            }
 +            if (bOpen < 0) {
@@ -11548,10 +11547,8 @@ index 0000000..a401454
 +        val edits = mutableListOf<Edit>()
 +        for (r in refs) edits.add(Edit(r.s, r.e, repl))
 +        var da = lineS; var db = lineE
-+        if (db < text.length && text[db] == '
-+') db++
-+        else if (da > 0 && text[da - 1] == '
-+') da--
++        if (db < text.length && text[db] == '\n') db++
++        else if (da > 0 && text[da - 1] == '\n') da--
 +        edits.add(Edit(da, db, ""))
 +        ed.expandAllFoldsNow()
 +        val sb = StringBuilder(text)
@@ -19264,10 +19261,10 @@ index 0000000..a163a4d
 +}
 diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/git/GitManager.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/git/GitManager.kt
 new file mode 100644
-index 0000000..83b2efd
+index 0000000..0c795b2
 --- /dev/null
 +++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/git/GitManager.kt
-@@ -0,0 +1,511 @@
+@@ -0,0 +1,514 @@
 +package com.nobidev.nobicode.git
 +
 +import android.content.Context
@@ -19520,12 +19517,15 @@ index 0000000..83b2efd
 +        withContext(Dispatchers.IO) {
 +            runCatching {
 +                open(dir).use { git ->
-+                    val result = git.revert()
++                    // JGit 6.7: RevertCommand.call() returns the new
++                    // RevCommit (null when the revert fails); the
++                    // RevertResult type only exists in newer JGit.
++                    val newCommit = git.revert()
 +                        .include(git.repository.resolve(hash)
 +                            ?: throw IllegalArgumentException("Commit nahi mila"))
 +                        .call()
-+                    if (result.status != org.eclipse.jgit.api.RevertResult.RevertStatus.OK) {
-+                        throw IllegalStateException("Revert fail: " + result.status)
++                    if (newCommit == null) {
++                        throw IllegalStateException("Revert fail")
 +                    }
 +                    Unit
 +                }
