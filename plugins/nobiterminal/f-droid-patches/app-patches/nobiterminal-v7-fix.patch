@@ -1,0 +1,77 @@
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+@@ -18,6 +18,7 @@
+ import android.text.Html
+ import android.text.TextWatcher
+ import android.util.LruCache
++import android.view.GestureDetector
+ import android.view.KeyEvent
+ import android.view.LayoutInflater
+ import android.view.Menu
+@@ -48,6 +49,7 @@
+ import android.widget.Toast
+ import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.core.widget.doOnTextChanged
++import androidx.appcompat.app.AlertDialog
+ import androidx.appcompat.app.AppCompatActivity
+ import androidx.core.view.GravityCompat
+ import androidx.core.view.ViewCompat
+@@ -734,8 +736,16 @@
+         val tab = if (activeTabIndex in openTabs.indices) openTabs[activeTabIndex] else null
+         val intent = Intent(this, com.nobidev.nobicode.ai.AiChatActivity::class.java)
+         intent.putExtra("ai_file_name", tab?.name ?: "")
+-        val sel = try { getEditor()?.selectedText() } catch (e: Exception) { null }
+-        val ctx = sel?.takeIf { it.isNotBlank() } ?: currentEditorLine() ?: ""
++        val sel = try {
++            val ed = binding.editor.text
++            if (ed == null) null
++            else {
++                val s0 = minOf(binding.editor.selectionStart, binding.editor.selectionEnd).coerceIn(0, ed.length)
++                val e0 = maxOf(binding.editor.selectionStart, binding.editor.selectionEnd).coerceIn(0, ed.length)
++                if (e0 > s0) ed.substring(s0, e0) else null
++            }
++        } catch (e: Exception) { null }
++        val ctx = sel?.takeIf { it.isNotBlank() } ?: binding.editor.text.toString().split("\n").getOrNull(currentEditorLine()) ?: ""
+         intent.putExtra("ai_context", ctx.take(4000))
+         startActivity(intent)
+     }
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
+@@ -2,6 +2,7 @@
+ 
+ import android.content.Context
+ import android.content.SharedPreferences
++import org.json.JSONObject
+ 
+ class EditorPreferences(context: Context) {
+     private val prefs: SharedPreferences = context.getSharedPreferences("nobi_ide_prefs", Context.MODE_PRIVATE)
+@@ -190,10 +191,25 @@
+         get() = prefs.getString("v7_file_bookmarks", "").orEmpty().split("\u0001").filter { it.isNotEmpty() }
+         set(value) = prefs.edit().putString("v7_file_bookmarks", value.take(50).joinToString("\u0001")).apply()
+ 
+-    /** v7 (57): per-file run configs as JSON (path -> {command,args,env}). */
+-    var runConfigs: String
+-        get() = prefs.getString("v7_run_configs", "{}") ?: "{}"
+-        set(value) = prefs.edit().putString("v7_run_configs", value).apply()
++    /** v7 (57): per-file run configs as JSON (path -> command string).
++     *  Map-backed: the getter parses the stored JSON object, the setter
++     *  serializes the map back to the same "v7_run_configs" key, so the
++     *  on-disk format is unchanged ("{}" when empty). Malformed JSON
++     *  reads as an empty map instead of crashing. */
++    var runConfigs: Map<String, String>
++        get() = try {
++            val obj = JSONObject(prefs.getString("v7_run_configs", "{}") ?: "{}")
++            val out = LinkedHashMap<String, String>()
++            val keys = obj.keys()
++            while (keys.hasNext()) {
++                val k = keys.next()
++                out[k] = obj.optString(k)
++            }
++            out
++        } catch (e: Exception) {
++            emptyMap()
++        }
++        set(value) = prefs.edit().putString("v7_run_configs", JSONObject(value).toString()).apply()
+ 
+     /** v7 (60): follow the terminal's cwd when the hook is installed. */
+     var followTerminalFolder: Boolean
