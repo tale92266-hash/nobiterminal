@@ -1,0 +1,2957 @@
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+index bae8ae0..b5d22ce 100644
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -74,6 +74,17 @@
+                 android:resource="@xml/shortcuts" />
+         </activity>
+ 
++        <!-- v6: "New Window" drawer entry. Same activity, own taskAffinity,
++             so it opens as a separate window/task even though TermuxActivity
++             itself is singleTask. Launched only from inside the app. -->
++        <activity-alias
++            android:name=".app.TermuxWindowActivity"
++            android:exported="false"
++            android:label="@string/application_name"
++            android:targetActivity=".app.TermuxActivity"
++            android:taskAffinity="${TERMUX_PACKAGE_NAME}.window"
++            android:theme="@style/Theme.NobiTerminal.Launch" />
++
+         <activity-alias
+             android:name=".HomeActivity"
+             android:exported="true"
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+index 0c786ed..c3e6df5 100644
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -9,6 +9,10 @@ import android.content.Context;
+ import android.content.Intent;
+ import android.content.IntentFilter;
+ import android.content.ServiceConnection;
++import android.content.SharedPreferences;
++import android.content.pm.ShortcutInfo;
++import android.content.pm.ShortcutManager;
++import android.graphics.drawable.Icon;
+ import android.net.Uri;
+ import android.os.Bundle;
+ import android.os.IBinder;
+@@ -28,7 +32,9 @@ import android.widget.Toast;
+ 
+ import com.termux.R;
+ import com.termux.app.api.file.FileReceiverActivity;
++import com.termux.app.nobi.NobiTerminalSearch;
+ import com.termux.app.terminal.TermuxActivityRootView;
++import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
+ import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
+ import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
+ import com.termux.shared.activities.ReportActivity;
+@@ -66,7 +72,14 @@ import androidx.appcompat.app.AppCompatActivity;
+ import androidx.drawerlayout.widget.DrawerLayout;
+ import androidx.viewpager.widget.ViewPager;
+ 
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.util.ArrayList;
+ import java.util.Arrays;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++import java.util.TreeSet;
+ 
+ /**
+  * A terminal emulator activity.
+@@ -141,6 +154,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+ 
+     NobiTabsController mNobiTabsController;
+ 
++    // v6 batch 1-16: app lock state, pending shared/run input, background time.
++    /** True once the app-lock PIN has been entered for this foreground stay. */
++    private boolean mNobiAppUnlocked = false;
++    /** When the activity last went to background (0 = never / just unlocked). */
++    private long mNobiBackgroundSince = 0;
++    /** Shared file path waiting to be typed into the current session. */
++    private String mPendingTerminalText = null;
++    /** Command waiting to be run in the current session (home shortcut). */
++    private String mPendingTerminalCommand = null;
++
+     /**
+      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
+      */
+@@ -325,6 +348,24 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(this, LOG_TAG);
+ 
+         mIsOnResumeAfterOnCreate = false;
++
++        // v6 (13): app lock — re-locks only after 60s in background, so
++        // quick trips to Settings / Nobi Code do not re-prompt.
++        checkNobiAppLock();
++    }
++
++    @Override
++    protected void onNewIntent(Intent intent) {
++        super.onNewIntent(intent);
++        // v6 (7/15): a home shortcut or shared file arriving while the app
++        // is already alive lands here (singleTask) instead of onCreate.
++        if (intent != null) {
++            String command = intent.getStringExtra("nobi_run_command");
++            String text = intent.getStringExtra("nobi_share_path");
++            if (command != null) mPendingTerminalCommand = command;
++            if (text != null) mPendingTerminalText = text;
++            deliverPendingTerminalInput();
++        }
+     }
+ 
+     @Override
+@@ -347,6 +388,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+ 
+         unregisterTermuxActivityBroadcastReceiver();
+         getDrawer().closeDrawers();
++
++        // v6 (1/13): remember live sessions for restore; note background
++        // time for the app-lock grace window.
++        saveNobiRestoreSessions();
++        mNobiBackgroundSince = System.currentTimeMillis();
+     }
+ 
+     @Override
+@@ -398,6 +444,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+         setNobiDrawerMenuView();
+ 
+         final Intent intent = getIntent();
++        // v6 (7/15): home-shortcut command / shared file path. Only fresh
++        // launches take them from the launch intent; a recreated activity
++        // must not re-run them (rotation would double-run a command).
++        if (!mIsActivityRecreated && intent != null) {
++            mPendingTerminalCommand = intent.getStringExtra("nobi_run_command");
++            mPendingTerminalText = intent.getStringExtra("nobi_share_path");
++        }
+         setIntent(null);
+ 
+         if (mTermuxService.isTermuxSessionsEmpty()) {
+@@ -409,7 +462,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+                         if (intent != null && intent.getExtras() != null) {
+                             launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
+                         }
+-                        mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
++                        // v6 (1): restore saved sessions instead of one fresh one.
++                        if (!restoreNobiSessions()) {
++                            mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
++                        }
++                        deliverPendingTerminalInput();
+                     } catch (WindowManager.BadTokenException e) {
+                         // Activity finished - ignore.
+                     }
+@@ -430,6 +487,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+                 mTermuxTerminalSessionActivityClient.setCurrentSession(mTermuxTerminalSessionActivityClient.getCurrentStoredSessionOrLast());
+             }
+         }
++        // v6 (7/15): deliver a pending home-shortcut command / shared path
++        // once a current session exists. Placed outside the branches (not
++        // inside the else) so the multi-window base patch's
++        // onServiceConnected hunk still applies cleanly on top.
++        deliverPendingTerminalInput();
+ 
+         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
+         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+@@ -519,14 +581,27 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+     }
+ 
+     /**
+-     * Wire the app-style navigation menu shown in the drawer (v5). Session
+-     * switching lives in the tabs bar, so the drawer offers sections
+-     * instead: Terminal, Nobi Code, New Session, Settings and Exit.
++     * Wire the app-style navigation menu shown in the drawer (v5, v6: the
++     * redundant "Terminal" row is gone — tapping the drawer already returns
++     * to the terminal — and "New Window" tops the menu). Session switching
++     * lives in the tabs bar, so the drawer offers sections instead:
++     * New Window, Nobi Code, New Session, Settings and Exit.
+      */
+     private void setNobiDrawerMenuView() {
+-        View terminalItem = findViewById(R.id.nobi_menu_terminal);
+-        if (terminalItem != null) {
+-            terminalItem.setOnClickListener(v -> getDrawer().closeDrawers());
++        View newWindowItem = findViewById(R.id.nobi_menu_new_window);
++        if (newWindowItem != null) {
++            newWindowItem.setOnClickListener(v -> {
++                getDrawer().closeDrawers();
++                // v6: a second terminal window = the same activity in its own
++                // task, via the .app.TermuxWindowActivity alias (own
++                // taskAffinity). TermuxActivity itself is singleTask, so a
++                // plain intent could never spawn a second instance.
++                Intent windowIntent = new Intent();
++                windowIntent.setComponent(new ComponentName(getPackageName(),
++                    getPackageName() + ".app.TermuxWindowActivity"));
++                windowIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++                startActivity(windowIntent);
++            });
+         }
+ 
+         View nobiCodeItem = findViewById(R.id.nobi_menu_nobicode);
+@@ -546,6 +621,39 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+             });
+         }
+ 
++        // v6 batch 1-16: terminal tools.
++        View quickCommandsItem = findViewById(R.id.nobi_menu_quick_commands);
++        if (quickCommandsItem != null) {
++            quickCommandsItem.setOnClickListener(v -> {
++                getDrawer().closeDrawers();
++                showQuickCommandsDialog();
++            });
++        }
++
++        View findItem = findViewById(R.id.nobi_menu_find);
++        if (findItem != null) {
++            findItem.setOnClickListener(v -> {
++                getDrawer().closeDrawers();
++                NobiTerminalSearch.show(this, getCurrentSession(), getTerminalView());
++            });
++        }
++
++        View serverItem = findViewById(R.id.nobi_menu_server);
++        if (serverItem != null) {
++            serverItem.setOnClickListener(v -> {
++                getDrawer().closeDrawers();
++                showServerDialog();
++            });
++        }
++
++        View sessionToolsItem = findViewById(R.id.nobi_menu_session_tools);
++        if (sessionToolsItem != null) {
++            sessionToolsItem.setOnClickListener(v -> {
++                getDrawer().closeDrawers();
++                showSessionToolsDialog();
++            });
++        }
++
+         View settingsItem = findViewById(R.id.nobi_menu_settings);
+         if (settingsItem != null) {
+             settingsItem.setOnClickListener(v ->
+@@ -565,6 +673,473 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+ 
+ 
+ 
++    // region v6 batch 1-16: terminal tools
++
++    /** Write text to the current session; with run=true append Enter. */
++    private void writeToCurrentSession(String text, boolean run) {
++        TerminalSession session = getCurrentSession();
++        if (session == null || !session.isRunning()) {
++            Toast.makeText(this, R.string.nobi_no_running_session, Toast.LENGTH_SHORT).show();
++            return;
++        }
++        String toWrite = run ? text + "\n" : text;
++        byte[] bytes = toWrite.getBytes(StandardCharsets.UTF_8);
++        session.write(bytes, 0, bytes.length);
++    }
++
++    /** Deliver a pending home-shortcut command / shared path, if possible. */
++    private void deliverPendingTerminalInput() {
++        if (mTermuxService == null) return;
++        TerminalSession session = getCurrentSession();
++        if (session == null || !session.isRunning()) return;
++        if (mPendingTerminalCommand != null) {
++            String command = mPendingTerminalCommand;
++            mPendingTerminalCommand = null;
++            writeToCurrentSession(command, true);
++        }
++        if (mPendingTerminalText != null) {
++            String text = mPendingTerminalText;
++            mPendingTerminalText = null;
++            writeToCurrentSession(text, false);
++        }
++    }
++
++    // region v6 (1): session restore
++
++    /** Save running sessions (cwd + name, in order) for restore on restart. */
++    private void saveNobiRestoreSessions() {
++        if (mTermuxService == null) return;
++        StringBuilder sb = new StringBuilder();
++        for (TermuxSession termuxSession : mTermuxService.getTermuxSessions()) {
++            if (termuxSession == null) continue;
++            TerminalSession session = termuxSession.getTerminalSession();
++            if (session == null || !session.isRunning()) continue;
++            String cwd = session.getCwd();
++            if (cwd == null || cwd.isEmpty()) continue;
++            String name = session.mSessionName != null ? session.mSessionName : "";
++            name = name.replace('\t', ' ').replace('\n', ' ');
++            if (sb.length() > 0) sb.append('\n');
++            sb.append(cwd).append('\t').append(name);
++        }
++        getSharedPreferences("nobi_restore", MODE_PRIVATE).edit()
++            .putString("sessions", sb.toString()).apply();
++    }
++
++    /** Recreate saved sessions. Returns false when nothing was saved. */
++    private boolean restoreNobiSessions() {
++        String saved = getSharedPreferences("nobi_restore", MODE_PRIVATE)
++            .getString("sessions", null);
++        if (saved == null || saved.isEmpty()) return false;
++        boolean restored = false;
++        for (String entry : saved.split("\n")) {
++            int sep = entry.indexOf('\t');
++            if (sep <= 0) continue;
++            String cwd = entry.substring(0, sep);
++            String name = entry.substring(sep + 1);
++            if (mTermuxTerminalSessionActivityClient.addNewSessionWithCwd(
++                cwd, name.isEmpty() ? null : name))
++                restored = true;
++        }
++        return restored;
++    }
++
++    // endregion
++
++    // region v6 (2): quick commands
++
++    private Set<String> loadQuickCommands() {
++        return new TreeSet<>(getSharedPreferences("nobi_quick_cmds", MODE_PRIVATE)
++            .getStringSet("commands", new HashSet<>()));
++    }
++
++    private void saveQuickCommands(Set<String> commands) {
++        getSharedPreferences("nobi_quick_cmds", MODE_PRIVATE).edit()
++            .putStringSet("commands", commands).apply();
++    }
++
++    private void showQuickCommandsDialog() {
++        final List<String> commands = new ArrayList<>(loadQuickCommands());
++        AlertDialog.Builder builder = new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_quick_commands_title)
++            .setItems(commands.toArray(new String[0]),
++                (dialog, which) -> writeToCurrentSession(commands.get(which), true))
++            .setPositiveButton(R.string.nobi_add, (dialog, which) ->
++                TextInputDialogUtils.textInput(TermuxActivity.this,
++                    R.string.nobi_quick_command_new_title, null,
++                    R.string.nobi_save, text -> {
++                        if (text == null || text.trim().isEmpty()) return;
++                        Set<String> updated = loadQuickCommands();
++                        updated.add(text.trim());
++                        saveQuickCommands(updated);
++                        Toast.makeText(this, R.string.nobi_quick_command_saved,
++                            Toast.LENGTH_SHORT).show();
++                    }, -1, null, -1, null, null))
++            .setNeutralButton(R.string.nobi_delete, (dialog, which) ->
++                showQuickCommandsDeleteDialog())
++            .setNegativeButton(android.R.string.cancel, null);
++        if (commands.isEmpty())
++            builder.setMessage(R.string.nobi_quick_commands_empty);
++        builder.show();
++    }
++
++    private void showQuickCommandsDeleteDialog() {
++        final List<String> commands = new ArrayList<>(loadQuickCommands());
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_quick_command_delete_title)
++            .setItems(commands.toArray(new String[0]), (dialog, which) -> {
++                Set<String> updated = loadQuickCommands();
++                updated.remove(commands.get(which));
++                saveQuickCommands(updated);
++                Toast.makeText(this, R.string.nobi_quick_command_deleted,
++                    Toast.LENGTH_SHORT).show();
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    // endregion
++
++    // region v6: session tools (notes, colours, startup commands, shortcut)
++
++    private void showSessionToolsDialog() {
++        String[] items = new String[]{
++            getString(R.string.nobi_session_notes_title),
++            getString(R.string.nobi_tab_colours_title),
++            getString(R.string.nobi_startup_commands_title),
++            getString(R.string.nobi_home_shortcut_title)};
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_session_tools_title)
++            .setItems(items, (dialog, which) -> {
++                switch (which) {
++                    case 0:
++                        showSessionNotesDialog();
++                        break;
++                    case 1:
++                        showTabColoursDialog();
++                        break;
++                    case 2:
++                        showStartupCommandsDialog();
++                        break;
++                    default:
++                        showHomeShortcutDialog();
++                        break;
++                }
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    /** Live sessions for the tools dialogs, in tab order when available. */
++    private List<TerminalSession> getNobiToolSessions() {
++        if (mNobiTabsController != null)
++            return mNobiTabsController.getOrderedSessions();
++        List<TerminalSession> sessions = new ArrayList<>();
++        if (mTermuxService != null) {
++            for (TermuxSession termuxSession : mTermuxService.getTermuxSessions()) {
++                if (termuxSession == null) continue;
++                TerminalSession session = termuxSession.getTerminalSession();
++                if (session != null) sessions.add(session);
++            }
++        }
++        return sessions;
++    }
++
++    private String getNobiToolLabel(TerminalSession session, int index) {
++        if (mNobiTabsController != null)
++            return mNobiTabsController.getTabLabel(session);
++        if (session.mSessionName != null && !session.mSessionName.isEmpty())
++            return session.mSessionName;
++        String title = session.getTitle();
++        if (title != null && !title.isEmpty()) return title;
++        return String.valueOf(index + 1);
++    }
++
++    // v6 (9): one note per tab, shown under the tabs bar.
++    private void showSessionNotesDialog() {
++        final List<TerminalSession> sessions = getNobiToolSessions();
++        String[] labels = new String[sessions.size()];
++        for (int i = 0; i < sessions.size(); i++)
++            labels[i] = getNobiToolLabel(sessions.get(i), i);
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_session_notes_title)
++            .setItems(labels, (dialog, which) -> {
++                final TerminalSession session = sessions.get(which);
++                String current = NobiTabsController.loadTabNotes(this).get(session.mHandle);
++                TextInputDialogUtils.textInput(TermuxActivity.this,
++                    R.string.nobi_session_note_title, current,
++                    R.string.nobi_save, text -> {
++                        NobiTabsController.saveTabNote(this, session.mHandle,
++                            text == null ? "" : text.trim());
++                        if (mNobiTabsController != null) mNobiTabsController.refreshTabs();
++                    },
++                    R.string.nobi_clear, text -> {
++                        NobiTabsController.saveTabNote(this, session.mHandle, "");
++                        if (mNobiTabsController != null) mNobiTabsController.refreshTabs();
++                    }, -1, null, null);
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    // v6 (10): per-tab colour dot.
++    private void showTabColoursDialog() {
++        final List<TerminalSession> sessions = getNobiToolSessions();
++        String[] labels = new String[sessions.size()];
++        for (int i = 0; i < sessions.size(); i++)
++            labels[i] = getNobiToolLabel(sessions.get(i), i);
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_tab_colours_title)
++            .setItems(labels, (dialog, which) -> {
++                final TerminalSession session = sessions.get(which);
++                final String[] names = new String[]{
++                    getString(R.string.nobi_colour_none),
++                    getString(R.string.nobi_colour_cyan),
++                    getString(R.string.nobi_colour_violet),
++                    getString(R.string.nobi_colour_green),
++                    getString(R.string.nobi_colour_amber),
++                    getString(R.string.nobi_colour_red),
++                    getString(R.string.nobi_colour_pink),
++                    getString(R.string.nobi_colour_blue),
++                    getString(R.string.nobi_colour_grey)};
++                final Integer[] values = new Integer[]{
++                    null, 0xFF22D3EE, 0xFF8B5CF6, 0xFF34D399, 0xFFFBBF24,
++                    0xFFFB7185, 0xFFF472B6, 0xFF60A5FA, 0xFF9AA5D9};
++                Integer current = NobiTabsController.loadTabColors(this).get(session.mHandle);
++                int checked = 0;
++                for (int i = 0; i < values.length; i++) {
++                    if (values[i] == null ? current == null : values[i].equals(current)) {
++                        checked = i;
++                        break;
++                    }
++                }
++                new AlertDialog.Builder(this)
++                    .setTitle(R.string.nobi_tab_colour_pick_title)
++                    .setSingleChoiceItems(names, checked, (d, c) -> {
++                        NobiTabsController.saveTabColor(this, session.mHandle, values[c]);
++                        if (mNobiTabsController != null) mNobiTabsController.refreshTabs();
++                        d.dismiss();
++                    })
++                    .setNegativeButton(android.R.string.cancel, null)
++                    .show();
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    // v6 (6): startup command per session name.
++    private Set<String> loadStartupCommands() {
++        return new HashSet<>(getSharedPreferences("nobi_startup_cmds", MODE_PRIVATE)
++            .getStringSet("cmds", new HashSet<>()));
++    }
++
++    private void saveStartupCommands(Set<String> commands) {
++        getSharedPreferences("nobi_startup_cmds", MODE_PRIVATE).edit()
++            .putStringSet("cmds", commands).apply();
++    }
++
++    /** Command for a session name, or null. Shared with the session client. */
++    public static String findStartupCommand(Context context, String sessionName) {
++        if (sessionName == null) return null;
++        Set<String> saved = context.getSharedPreferences("nobi_startup_cmds", MODE_PRIVATE)
++            .getStringSet("cmds", null);
++        if (saved == null) return null;
++        for (String entry : saved) {
++            int sep = entry.indexOf('\t');
++            if (sep > 0 && sessionName.equals(entry.substring(0, sep)))
++                return entry.substring(sep + 1);
++        }
++        return null;
++    }
++
++    private void showStartupCommandsDialog() {
++        final List<String> entries = new ArrayList<>(loadStartupCommands());
++        java.util.Collections.sort(entries);
++        String[] labels = new String[entries.size()];
++        for (int i = 0; i < entries.size(); i++) {
++            int sep = entries.get(i).indexOf('\t');
++            labels[i] = sep > 0 ? entries.get(i).substring(0, sep) + " → "
++                + entries.get(i).substring(sep + 1) : entries.get(i);
++        }
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_startup_commands_title)
++            .setItems(labels, (dialog, which) -> {
++                // Tapping an entry removes it; re-add to change it.
++                Set<String> updated = loadStartupCommands();
++                updated.remove(entries.get(which));
++                saveStartupCommands(updated);
++                Toast.makeText(this, R.string.nobi_startup_command_deleted,
++                    Toast.LENGTH_SHORT).show();
++            })
++            .setPositiveButton(R.string.nobi_add, (dialog, which) -> {
++                final EditText nameInput = new EditText(this);
++                nameInput.setSingleLine();
++                nameInput.setHint(R.string.nobi_startup_name_hint);
++                final EditText commandInput = new EditText(this);
++                commandInput.setSingleLine();
++                commandInput.setHint(R.string.nobi_startup_command_hint);
++                int pad = (int) (16 * getResources().getDisplayMetrics().density);
++                android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
++                layout.setOrientation(android.widget.LinearLayout.VERTICAL);
++                layout.setPadding(pad, pad, pad, pad);
++                layout.addView(nameInput);
++                layout.addView(commandInput);
++                new AlertDialog.Builder(this)
++                    .setTitle(R.string.nobi_startup_add_title)
++                    .setView(layout)
++                    .setPositiveButton(R.string.nobi_save, (d, w) -> {
++                        String name = nameInput.getText().toString().trim();
++                        String command = commandInput.getText().toString().trim();
++                        if (name.isEmpty() || command.isEmpty()) return;
++                        Set<String> updated = loadStartupCommands();
++                        java.util.Iterator<String> it = updated.iterator();
++                        while (it.hasNext()) {
++                            if (it.next().startsWith(name + "\t")) it.remove();
++                        }
++                        updated.add(name + "\t" + command);
++                        saveStartupCommands(updated);
++                        Toast.makeText(this, R.string.nobi_startup_command_saved,
++                            Toast.LENGTH_SHORT).show();
++                    })
++                    .setNegativeButton(android.R.string.cancel, null)
++                    .show();
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    // v6 (7): pinned home-screen shortcut for a session or a command.
++    private void showHomeShortcutDialog() {
++        String[] items = new String[]{
++            getString(R.string.nobi_shortcut_new_session),
++            getString(R.string.nobi_shortcut_command)};
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_home_shortcut_title)
++            .setItems(items, (dialog, which) -> {
++                if (which == 0) {
++                    Intent intent = new Intent(this, TermuxActivity.class);
++                    intent.setAction(Intent.ACTION_RUN);
++                    requestNobiShortcut("nobi_shortcut_session",
++                        getString(R.string.nobi_shortcut_new_session),
++                        R.drawable.ic_new_session, intent);
++                } else {
++                    TextInputDialogUtils.textInput(TermuxActivity.this,
++                        R.string.nobi_shortcut_command_title, null,
++                        R.string.nobi_save, text -> {
++                            if (text == null || text.trim().isEmpty()) return;
++                            String command = text.trim();
++                            Intent intent = new Intent(this, TermuxActivity.class);
++                            intent.setAction(Intent.ACTION_RUN);
++                            intent.putExtra("nobi_run_command", command);
++                            String label = command.length() > 25
++                                ? command.substring(0, 25) : command;
++                            requestNobiShortcut("nobi_shortcut_cmd_" + label.hashCode(),
++                                label, R.drawable.ic_nobi_terminal, intent);
++                        }, -1, null, -1, null, null);
++                }
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    private void requestNobiShortcut(String id, String label, int iconRes, Intent intent) {
++        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
++            Toast.makeText(this, R.string.nobi_shortcut_unsupported,
++                Toast.LENGTH_SHORT).show();
++            return;
++        }
++        ShortcutManager manager = getSystemService(ShortcutManager.class);
++        if (manager == null || !manager.isRequestPinShortcutSupported()) {
++            Toast.makeText(this, R.string.nobi_shortcut_unsupported,
++                Toast.LENGTH_SHORT).show();
++            return;
++        }
++        ShortcutInfo info = new ShortcutInfo.Builder(this, id)
++            .setShortLabel(label)
++            .setIcon(Icon.createWithResource(this, iconRes))
++            .setIntent(intent)
++            .build();
++        manager.requestPinShortcut(info, null);
++        Toast.makeText(this, R.string.nobi_shortcut_added, Toast.LENGTH_SHORT).show();
++    }
++
++    // v6 (14): one tap to start a web or SSH server in its own session.
++    private void showServerDialog() {
++        String[] items = new String[]{
++            getString(R.string.nobi_server_web),
++            getString(R.string.nobi_server_ssh)};
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_server_title)
++            .setItems(items, (dialog, which) -> {
++                if (which == 0) {
++                    mTermuxTerminalSessionActivityClient.addNewSession(false, "Web Server");
++                    writeToCurrentSession(
++                        "command -v python3 >/dev/null || pkg install -y python; "
++                            + "python3 -m http.server 8080", true);
++                    Toast.makeText(this, R.string.nobi_server_web_started,
++                        Toast.LENGTH_LONG).show();
++                } else {
++                    mTermuxTerminalSessionActivityClient.addNewSession(false, "SSH Server");
++                    writeToCurrentSession(
++                        "command -v sshd >/dev/null || pkg install -y openssh; "
++                            + "sshd -p 8022 && echo SSH server running on port 8022", true);
++                    Toast.makeText(this, R.string.nobi_server_ssh_started,
++                        Toast.LENGTH_LONG).show();
++                }
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
++    // endregion
++
++    // region v6 (13): app lock (PIN; biometric stays pending, needs a new dep)
++
++    /** SHA-256 hex of a PIN, for storage comparison (never store the PIN). */
++    public static String nobiSha256(String value) {
++        try {
++            MessageDigest digest = MessageDigest.getInstance("SHA-256");
++            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
++            StringBuilder sb = new StringBuilder();
++            for (byte b : hash) sb.append(String.format("%02x", b));
++            return sb.toString();
++        } catch (Exception e) {
++            return null;
++        }
++    }
++
++    private void checkNobiAppLock() {
++        if (isFinishing()) return;
++        String hash = getSharedPreferences("nobi_applock", MODE_PRIVATE)
++            .getString("pin_hash", null);
++        if (hash == null) return;
++        if (mNobiAppUnlocked && (mNobiBackgroundSince == 0
++            || System.currentTimeMillis() - mNobiBackgroundSince < 60000)) return;
++        final EditText input = new EditText(this);
++        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
++            | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
++        int pad = (int) (16 * getResources().getDisplayMetrics().density);
++        input.setPadding(pad, pad, pad, pad);
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_app_locked_title)
++            .setMessage(R.string.nobi_app_locked_message)
++            .setView(input)
++            .setCancelable(false)
++            .setPositiveButton(R.string.nobi_unlock, (dialog, which) -> {
++                if (hash.equals(nobiSha256(input.getText().toString()))) {
++                    mNobiAppUnlocked = true;
++                    mNobiBackgroundSince = 0;
++                } else {
++                    Toast.makeText(this, R.string.nobi_wrong_pin,
++                        Toast.LENGTH_SHORT).show();
++                    checkNobiAppLock();
++                }
++            })
++            .setNeutralButton(R.string.nobi_exit, (dialog, which) -> finish())
++            .show();
++    }
++
++    // endregion
++
+     private void setTerminalToolbarView(Bundle savedInstanceState) {
+         mTermuxTerminalExtraKeys = new TermuxTerminalExtraKeys(this, mTerminalView,
+             mTermuxTerminalViewClient, mTermuxTerminalSessionActivityClient);
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxService.java b/termux-app/app/src/main/java/com/termux/app/TermuxService.java
+index 8025d0b..6180f3d 100644
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxService.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxService.java
+@@ -119,6 +119,13 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
+ 
+         runStartForeground();
+ 
++        // v6 (16): persistent wake lock — re-acquire on service start when
++        // the user left "Keep sessions alive" on in Settings.
++        if (androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
++            .getBoolean("nobi_wake_lock", false)) {
++            actionAcquireWakeLock();
++        }
++
+         SystemEventReceiver.registerPackageUpdateEvents(this);
+     }
+ 
+@@ -818,8 +825,9 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
+         // Set notification icon
+         builder.setSmallIcon(R.drawable.ic_service_notification);
+ 
+-        // Set background color for small notification icon
+-        builder.setColor(0xFF607D8B);
++        // Set background color for small notification icon (v6: neon cyan,
++        // matching the N icon, instead of the old Termux grey-blue)
++        builder.setColor(0xFF22D3EE);
+ 
+         // TermuxSessions are always ongoing
+         builder.setOngoing(true);
+diff --git a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+index f2c6414..be00a84 100644
+--- a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+@@ -1,15 +1,25 @@
+ package com.termux.app.activities;
+ 
++import android.app.AlertDialog;
+ import android.content.Context;
++import android.content.Intent;
++import android.content.SharedPreferences;
+ import android.os.Bundle;
+ import android.os.Environment;
++import android.text.InputType;
++import android.widget.EditText;
++import android.widget.LinearLayout;
++import android.widget.Toast;
+ 
+ import androidx.annotation.NonNull;
+ import androidx.appcompat.app.AppCompatActivity;
++import androidx.preference.CheckBoxPreference;
+ import androidx.preference.Preference;
+ import androidx.preference.PreferenceFragmentCompat;
+ 
+ import com.termux.R;
++import com.termux.app.TermuxActivity;
++import com.termux.app.TermuxService;
+ import com.termux.shared.activities.ReportActivity;
+ import com.termux.shared.file.FileUtils;
+ import com.termux.shared.models.ReportInfo;
+@@ -73,6 +83,8 @@ public class SettingsActivity extends AppCompatActivity {
+                     configureNobiBackupPreference(context);
+                     configureNobiRestorePreference(context);
+                     configureNobiDevSetupPreference(context);
++                    configureNobiWakeLockPreference(context);
++                    configureNobiAppLockPreference(context);
+                 }
+             }.start();
+         }
+@@ -198,6 +210,113 @@ public class SettingsActivity extends AppCompatActivity {
+                 });
+             }
+         }
++
++        // v6 (16): persistent wake lock — the checkbox persists itself;
++        // the change is forwarded to the service, which already knows how
++        // to acquire/release wake locks for its notification actions.
++        private void configureNobiWakeLockPreference(@NonNull Context context) {
++            CheckBoxPreference wakeLockPreference = findPreference("nobi_wake_lock");
++            if (wakeLockPreference != null) {
++                wakeLockPreference.setOnPreferenceChangeListener((preference, newValue) -> {
++                    Intent intent = new Intent(context, TermuxService.class);
++                    intent.setAction((Boolean) newValue
++                        ? TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_LOCK
++                        : TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_UNLOCK);
++                    context.startService(intent);
++                    return true;
++                });
++            }
++        }
++
++        // v6 (13): app lock PIN setup/change/remove. Only the SHA-256 hash
++        // is stored, never the PIN itself.
++        private void configureNobiAppLockPreference(@NonNull Context context) {
++            Preference appLockPreference = findPreference("nobi_app_lock");
++            if (appLockPreference != null) {
++                appLockPreference.setOnPreferenceClickListener(preference -> {
++                    showNobiAppLockDialog(context);
++                    return true;
++                });
++            }
++        }
++
++        private void showNobiAppLockDialog(@NonNull Context context) {
++            SharedPreferences prefs = context.getSharedPreferences("nobi_applock", Context.MODE_PRIVATE);
++            String existing = prefs.getString("pin_hash", null);
++            if (existing == null) {
++                showNobiAppLockSetDialog(context, prefs);
++                return;
++            }
++            final EditText input = nobiPinInput(context);
++            new AlertDialog.Builder(context)
++                .setTitle(R.string.nobi_app_lock_current_title)
++                .setView(input)
++                .setPositiveButton(R.string.nobi_unlock, (dialog, which) -> {
++                    if (existing.equals(TermuxActivity.nobiSha256(input.getText().toString()))) {
++                        new AlertDialog.Builder(context)
++                            .setTitle(R.string.nobi_app_lock_preference_title)
++                            .setItems(new String[]{
++                                context.getString(R.string.nobi_app_lock_change_pin),
++                                context.getString(R.string.nobi_app_lock_remove)}, (d, c) -> {
++                                if (c == 0) {
++                                    showNobiAppLockSetDialog(context, prefs);
++                                } else {
++                                    prefs.edit().remove("pin_hash").apply();
++                                    Toast.makeText(context, R.string.nobi_app_lock_removed,
++                                        Toast.LENGTH_SHORT).show();
++                                }
++                            })
++                            .setNegativeButton(android.R.string.cancel, null)
++                            .show();
++                    } else {
++                        Toast.makeText(context, R.string.nobi_wrong_pin,
++                            Toast.LENGTH_SHORT).show();
++                        showNobiAppLockDialog(context);
++                    }
++                })
++                .setNegativeButton(android.R.string.cancel, null)
++                .show();
++        }
++
++        private void showNobiAppLockSetDialog(@NonNull Context context, SharedPreferences prefs) {
++            final EditText pinInput = nobiPinInput(context);
++            pinInput.setHint(R.string.nobi_app_lock_pin_hint);
++            final EditText confirmInput = nobiPinInput(context);
++            confirmInput.setHint(R.string.nobi_app_lock_confirm_hint);
++            LinearLayout layout = new LinearLayout(context);
++            layout.setOrientation(LinearLayout.VERTICAL);
++            int pad = (int) (16 * context.getResources().getDisplayMetrics().density);
++            layout.setPadding(pad, pad, pad, pad);
++            layout.addView(pinInput);
++            layout.addView(confirmInput);
++            new AlertDialog.Builder(context)
++                .setTitle(R.string.nobi_app_lock_set_title)
++                .setView(layout)
++                .setPositiveButton(R.string.nobi_save, (dialog, which) -> {
++                    String pin = pinInput.getText().toString();
++                    String confirm = confirmInput.getText().toString();
++                    if (pin.isEmpty() || !pin.equals(confirm)) {
++                        Toast.makeText(context, R.string.nobi_app_lock_pin_mismatch,
++                            Toast.LENGTH_SHORT).show();
++                        showNobiAppLockSetDialog(context, prefs);
++                        return;
++                    }
++                    prefs.edit().putString("pin_hash", TermuxActivity.nobiSha256(pin)).apply();
++                    Toast.makeText(context, R.string.nobi_app_lock_pin_set,
++                        Toast.LENGTH_SHORT).show();
++                })
++                .setNegativeButton(android.R.string.cancel, null)
++                .show();
++        }
++
++        private EditText nobiPinInput(@NonNull Context context) {
++            EditText input = new EditText(context);
++            input.setInputType(InputType.TYPE_CLASS_NUMBER
++                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
++            int pad = (int) (16 * context.getResources().getDisplayMetrics().density);
++            input.setPadding(pad, pad, pad, pad);
++            return input;
++        }
+     }
+ 
+ }
+diff --git a/termux-app/app/src/main/java/com/termux/app/api/file/FileReceiverActivity.java b/termux-app/app/src/main/java/com/termux/app/api/file/FileReceiverActivity.java
+index ca5c074..ca8019e 100644
+--- a/termux-app/app/src/main/java/com/termux/app/api/file/FileReceiverActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/api/file/FileReceiverActivity.java
+@@ -1,5 +1,6 @@
+ package com.termux.app.api.file;
+ 
++import android.app.AlertDialog;
+ import android.content.Context;
+ import android.content.Intent;
+ import android.database.Cursor;
+@@ -21,6 +22,7 @@ import com.termux.shared.termux.interact.TextInputDialogUtils;
+ import com.termux.shared.termux.TermuxConstants;
+ import com.termux.shared.termux.TermuxConstants.TERMUX_APP;
+ import com.termux.shared.termux.TermuxConstants.TERMUX_APP.TERMUX_SERVICE;
++import com.termux.app.TermuxActivity;
+ import com.termux.app.TermuxService;
+ import com.termux.shared.logger.Logger;
+ import com.termux.shared.termux.settings.properties.TermuxAppSharedProperties;
+@@ -167,11 +169,11 @@ public class FileReceiverActivity extends AppCompatActivity {
+ 
+                 final File editorProgramFile = new File(EDITOR_PROGRAM);
+                 if (!editorProgramFile.isFile()) {
+-                    showErrorDialogAndQuit("The following file does not exist:\n$HOME/bin/termux-file-editor\n\n"
+-                        + "Create this file as a script or a symlink - it will be called with the received file as only argument.");
++                    // v6 (15): no termux-file-editor script configured — offer
++                    // the NobiTerminal choices instead of the old error dialog.
++                    showNobiShareChoiceDialog(outFile);
+                     return;
+                 }
+-
+                 // Do this for the user if necessary:
+                 //noinspection ResultOfMethodCallIgnored
+                 editorProgramFile.setExecutable(true);
+@@ -198,6 +200,37 @@ public class FileReceiverActivity extends AppCompatActivity {
+             });
+     }
+ 
++    /**
++     * v6 (15): after a shared file is saved, let the user send its path to
++     * the terminal or open it in the Nobi Code editor, instead of only
++     * failing when no termux-file-editor script exists.
++     */
++    private void showNobiShareChoiceDialog(final File outFile) {
++        final String path = outFile.getAbsolutePath();
++        new AlertDialog.Builder(this)
++            .setTitle(R.string.nobi_share_choice_title)
++            .setItems(new String[]{
++                getString(R.string.nobi_share_open_editor),
++                getString(R.string.nobi_share_type_path),
++                getString(R.string.nobi_share_done)}, (dialog, which) -> {
++                if (which == 0) {
++                    Intent editorIntent = new Intent(this, com.nobidev.nobicode.MainActivity.class);
++                    editorIntent.putExtra("nobi_open_file_path", path);
++                    startActivity(editorIntent);
++                    finish();
++                } else if (which == 1) {
++                    Intent terminalIntent = new Intent(this, TermuxActivity.class);
++                    terminalIntent.putExtra("nobi_share_path", path);
++                    startActivity(terminalIntent);
++                    finish();
++                } else {
++                    finish();
++                }
++            })
++            .setOnCancelListener(dialog -> finish())
++            .show();
++    }
++
+     public File saveStreamWithName(InputStream in, String attachmentFileName) {
+         File receiveDir = new File(TERMUX_RECEIVEDIR);
+ 
+diff --git a/termux-app/app/src/main/java/com/termux/app/fragments/settings/nobi/ExtraKeysPreferencesFragment.java b/termux-app/app/src/main/java/com/termux/app/fragments/settings/nobi/ExtraKeysPreferencesFragment.java
+index 40cf75b..c0dc29b 100644
+--- a/termux-app/app/src/main/java/com/termux/app/fragments/settings/nobi/ExtraKeysPreferencesFragment.java
++++ b/termux-app/app/src/main/java/com/termux/app/fragments/settings/nobi/ExtraKeysPreferencesFragment.java
+@@ -1,20 +1,31 @@
+ package com.termux.app.fragments.settings.nobi;
+ 
++import android.app.AlertDialog;
+ import android.content.Context;
+ import android.os.Bundle;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.ArrayAdapter;
++import android.widget.Button;
++import android.widget.LinearLayout;
++import android.widget.ListView;
++import android.widget.TextView;
+ import android.widget.Toast;
+ 
+ import androidx.annotation.Keep;
+ import androidx.preference.CheckBoxPreference;
+ import androidx.preference.ListPreference;
++import androidx.preference.Preference;
+ import androidx.preference.PreferenceFragmentCompat;
+ 
+ import com.termux.R;
+ import com.termux.app.nobi.NobiTerminalUtils;
+ import com.termux.shared.termux.settings.properties.TermuxPropertyConstants;
+ 
++import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.HashSet;
++import java.util.List;
+ import java.util.Set;
+ 
+ @Keep
+@@ -40,6 +51,15 @@ public class ExtraKeysPreferencesFragment extends PreferenceFragmentCompat {
+             });
+         }
+ 
++        // v6 (4): reorder the bar's keys (add/remove stays on the toggles).
++        Preference reorderPreference = findPreference("nobi_extra_keys_reorder");
++        if (reorderPreference != null) {
++            reorderPreference.setOnPreferenceClickListener(preference -> {
++                showReorderDialog(context);
++                return true;
++            });
++        }
++
+         // Show the keys that are currently in effect and save every change
+         // straight to ~/.termux/termux.properties.
+         Set<String> currentKeys = NobiTerminalUtils.getCurrentExtraKeys();
+@@ -57,14 +77,16 @@ public class ExtraKeysPreferencesFragment extends PreferenceFragmentCompat {
+                 checkBox.setOnPreferenceChangeListener((preference, newValue) -> {
+                     if (mUpdatingCheckBoxes)
+                         return true;
+-                    Set<String> enabledKeys = new HashSet<>();
+-                    for (String otherKey : NobiTerminalUtils.ALL_EXTRA_KEYS) {
+-                        CheckBoxPreference other = findPreference(getCheckBoxKey(otherKey));
+-                        boolean enabled = otherKey.equals(key) ? (Boolean) newValue : (other != null && other.isChecked());
+-                        if (enabled)
+-                            enabledKeys.add(otherKey);
++                    // v6 (4): keep the file's key order (incl. any custom
++                    // reorder) instead of recomposing canonically, so a
++                    // toggle does not silently undo a reorder.
++                    List<String> ordered = new ArrayList<>(NobiTerminalUtils.getCurrentExtraKeys());
++                    if ((Boolean) newValue) {
++                        if (!ordered.contains(key)) ordered.add(key);
++                    } else {
++                        ordered.remove(key);
+                     }
+-                    if (!saveExtraKeys(context, NobiTerminalUtils.composeExtraKeysValue(enabledKeys)))
++                    if (!saveExtraKeys(context, NobiTerminalUtils.composeExtraKeysValueOrdered(ordered)))
+                         return false;
+                     setPresetValue(PRESET_CUSTOM);
+                     return true;
+@@ -73,6 +95,74 @@ public class ExtraKeysPreferencesFragment extends PreferenceFragmentCompat {
+         }
+     }
+ 
++    /** v6 (4): reorder dialog — up/down per key, saved in file order. */
++    private void showReorderDialog(Context context) {
++        final List<String> order = new ArrayList<>(NobiTerminalUtils.getCurrentExtraKeys());
++        if (order.isEmpty()) {
++            Toast.makeText(context, R.string.nobi_extra_keys_reorder_empty, Toast.LENGTH_SHORT).show();
++            return;
++        }
++        final ArrayAdapter<String> adapter = new ArrayAdapter<String>(context,
++            android.R.layout.simple_list_item_1, order) {
++            @Override
++            public View getView(final int position, View convertView, ViewGroup parent) {
++                LinearLayout row;
++                TextView label;
++                if (convertView instanceof LinearLayout) {
++                    row = (LinearLayout) convertView;
++                    label = (TextView) row.getChildAt(0);
++                } else {
++                    row = new LinearLayout(context);
++                    row.setOrientation(LinearLayout.HORIZONTAL);
++                    label = new TextView(context);
++                    LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
++                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
++                    label.setLayoutParams(labelParams);
++                    Button up = new Button(context);
++                    up.setText("▲");
++                    Button down = new Button(context);
++                    down.setText("▼");
++                    row.addView(label);
++                    row.addView(up);
++                    row.addView(down);
++                }
++                label.setText(order.get(position));
++                Button up = (Button) row.getChildAt(1);
++                Button down = (Button) row.getChildAt(2);
++                up.setOnClickListener(v -> {
++                    if (position > 0) {
++                        String key = order.remove(position);
++                        order.add(position - 1, key);
++                        notifyDataSetChanged();
++                    }
++                });
++                down.setOnClickListener(v -> {
++                    if (position < order.size() - 1) {
++                        String key = order.remove(position);
++                        order.add(position + 1, key);
++                        notifyDataSetChanged();
++                    }
++                });
++                return row;
++            }
++        };
++        ListView listView = new ListView(context);
++        listView.setAdapter(adapter);
++        float density = context.getResources().getDisplayMetrics().density;
++        int height = (int) (Math.min(order.size(), 8) * 56 * density);
++        listView.setLayoutParams(new LinearLayout.LayoutParams(
++            LinearLayout.LayoutParams.MATCH_PARENT, height));
++        new AlertDialog.Builder(context)
++            .setTitle(R.string.nobi_extra_keys_reorder_title)
++            .setView(listView)
++            .setPositiveButton(R.string.nobi_save, (dialog, which) -> {
++                if (saveExtraKeys(context, NobiTerminalUtils.composeExtraKeysValueOrdered(order)))
++                    setPresetValue(PRESET_CUSTOM);
++            })
++            .setNegativeButton(android.R.string.cancel, null)
++            .show();
++    }
++
+     private void applyPreset(Context context, String preset) {
+         switch (preset) {
+             case "default":
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalSearch.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalSearch.java
+new file mode 100644
+index 0000000..77d90e1
+--- /dev/null
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalSearch.java
+@@ -0,0 +1,158 @@
++package com.termux.app.nobi;
++
++import android.app.Activity;
++import android.app.AlertDialog;
++import android.text.Editable;
++import android.text.TextWatcher;
++import android.widget.Button;
++import android.widget.EditText;
++import android.widget.LinearLayout;
++import android.widget.TextView;
++
++import com.termux.R;
++import com.termux.terminal.TerminalEmulator;
++import com.termux.terminal.TerminalSession;
++import com.termux.view.TerminalView;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++
++/**
++ * v6 (5): terminal search — find text in the scrollback.
++ *
++ * The dialog stays open while navigating: typing a query collects all
++ * case-insensitive matches from the transcript and jumps to the first one;
++ * Previous/Next cycle through them. The terminal view is scrolled so the
++ * match line lands mid-screen (there is no match-highlight API in
++ * TerminalView, so scrolling + the "n of m" counter is the signal).
++ */
++public final class NobiTerminalSearch {
++
++    private NobiTerminalSearch() {
++    }
++
++    public static void show(final Activity activity, final TerminalSession session,
++                            final TerminalView terminalView) {
++        if (activity == null || session == null || terminalView == null) return;
++        final TerminalEmulator emulator = session.getEmulator();
++        if (emulator == null || emulator.getScreen() == null) return;
++
++        final String transcript = emulator.getScreen().getTranscriptText();
++        if (transcript == null || transcript.isEmpty()) return;
++
++        float density = activity.getResources().getDisplayMetrics().density;
++        int pad = (int) (16 * density);
++
++        LinearLayout layout = new LinearLayout(activity);
++        layout.setOrientation(LinearLayout.VERTICAL);
++        layout.setPadding(pad, pad, pad, pad);
++
++        final EditText queryInput = new EditText(activity);
++        queryInput.setSingleLine();
++        queryInput.setHint(R.string.nobi_find_hint);
++        layout.addView(queryInput);
++
++        final TextView counterView = new TextView(activity);
++        counterView.setPadding(0, pad / 2, 0, pad / 2);
++        layout.addView(counterView);
++
++        LinearLayout buttons = new LinearLayout(activity);
++        buttons.setOrientation(LinearLayout.HORIZONTAL);
++        final Button prevButton = new Button(activity);
++        prevButton.setText(R.string.nobi_find_previous);
++        final Button nextButton = new Button(activity);
++        nextButton.setText(R.string.nobi_find_next);
++        final Button closeButton = new Button(activity);
++        closeButton.setText(android.R.string.cancel);
++        buttons.addView(prevButton);
++        buttons.addView(nextButton);
++        buttons.addView(closeButton);
++        layout.addView(buttons);
++
++        final List<Integer> matches = new ArrayList<>();
++        final int[] currentIndex = {-1};
++
++        final Runnable jumpTo = new Runnable() {
++            @Override
++            public void run() {
++                if (currentIndex[0] < 0 || currentIndex[0] >= matches.size()) return;
++                int offset = matches.get(currentIndex[0]);
++                int line = 0;
++                for (int i = 0; i < offset && i < transcript.length(); i++) {
++                    if (transcript.charAt(i) == '\n') line++;
++                }
++                int historyRows = emulator.getScreen().getActiveTranscriptRows();
++                int matchRow = line - historyRows;
++                int visibleRows = emulator.mRows;
++                int topRow = matchRow - visibleRows / 2;
++                if (topRow < -historyRows) topRow = -historyRows;
++                if (topRow > 0) topRow = 0;
++                terminalView.setTopRow(topRow);
++                counterView.setText((currentIndex[0] + 1) + " / " + matches.size());
++            }
++        };
++
++        final Runnable recompute = new Runnable() {
++            @Override
++            public void run() {
++                String query = queryInput.getText().toString();
++                matches.clear();
++                currentIndex[0] = -1;
++                if (query.length() >= 2) {
++                    String haystack = transcript.toLowerCase(Locale.ROOT);
++                    String needle = query.toLowerCase(Locale.ROOT);
++                    int from = 0;
++                    while (true) {
++                        int found = haystack.indexOf(needle, from);
++                        if (found < 0) break;
++                        matches.add(found);
++                        from = found + needle.length();
++                        if (matches.size() > 5000) break;
++                    }
++                }
++                if (matches.isEmpty()) {
++                    counterView.setText(R.string.nobi_find_no_match);
++                } else {
++                    currentIndex[0] = 0;
++                    jumpTo.run();
++                }
++            }
++        };
++
++        queryInput.addTextChangedListener(new TextWatcher() {
++            @Override
++            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
++            }
++
++            @Override
++            public void onTextChanged(CharSequence s, int start, int before, int count) {
++            }
++
++            @Override
++            public void afterTextChanged(Editable s) {
++                recompute.run();
++            }
++        });
++
++        final AlertDialog dialog = new AlertDialog.Builder(activity)
++            .setTitle(R.string.nobi_find_title)
++            .setView(layout)
++            .setCancelable(true)
++            .create();
++
++        prevButton.setOnClickListener(v -> {
++            if (matches.isEmpty()) return;
++            currentIndex[0] = (currentIndex[0] - 1 + matches.size()) % matches.size();
++            jumpTo.run();
++        });
++        nextButton.setOnClickListener(v -> {
++            if (matches.isEmpty()) return;
++            currentIndex[0] = (currentIndex[0] + 1) % matches.size();
++            jumpTo.run();
++        });
++        closeButton.setOnClickListener(v -> dialog.dismiss());
++
++        dialog.show();
++    }
++}
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
+index effcd24..c5fe026 100644
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
+@@ -178,6 +178,30 @@ public final class NobiTerminalUtils {
+                     "#7C5CFF", "#C77DFF", "#4DD8E6", "#E4DCFF",
+                     "#3D2560", "#FF7A93", "#8CF5C0", "#FFD97A",
+                     "#9D85FF", "#DDA8FF", "#8AE6F0", "#FFFFFF"};
++            case "nord":
++                // v6 themes gallery: arctic, low-contrast blues.
++                return new String[]{
++                    "#2E3440", "#D8DEE9", "#88C0D0",
++                    "#3B4252", "#BF616A", "#A3BE8C", "#EBCB8B",
++                    "#81A1C1", "#B48EAD", "#88C0D0", "#ECEFF4",
++                    "#4C566A", "#BF616A", "#A3BE8C", "#EBCB8B",
++                    "#81A1C1", "#B48EAD", "#8FBCBB", "#ECEFF4"};
++            case "monokai":
++                // v6 themes gallery: warm dark classic.
++                return new String[]{
++                    "#272822", "#F8F8F2", "#F8F8F2",
++                    "#3E3D32", "#F92672", "#A6E22E", "#F4BF75",
++                    "#66D9EF", "#AE81FF", "#A1EFE4", "#F8F8F2",
++                    "#75715E", "#F92672", "#A6E22E", "#F4BF75",
++                    "#66D9EF", "#AE81FF", "#A1EFE4", "#F9F8F5"};
++            case "gruvbox":
++                // v6 themes gallery: retro groove, dark warm brown.
++                return new String[]{
++                    "#282828", "#EBDBB2", "#FABD2F",
++                    "#3C3836", "#CC241D", "#98971A", "#D79921",
++                    "#458588", "#B16286", "#689D6A", "#EBDBB2",
++                    "#665C54", "#FB4934", "#B8BB26", "#FABD2F",
++                    "#83A598", "#D3869B", "#8EC07C", "#FBF1C7"};
+             default:
+                 return null;
+         }
+@@ -245,6 +269,40 @@ public final class NobiTerminalUtils {
+         return parseExtraKeysValue(value);
+     }
+ 
++    /**
++     * v6 (4): compose an extra-keys property value from an ORDERED list of
++     * keys, preserving the given relative order inside each row. Row 1 holds
++     * the editing keys, row 2 the navigation keys (same grouping as the
++     * canonical compose); unknown keys go at the end of row 1.
++     */
++    @NonNull
++    public static String composeExtraKeysValueOrdered(@NonNull java.util.List<String> orderedKeys) {
++        java.util.List<String> row1Keys = new java.util.ArrayList<>();
++        java.util.List<String> row2Keys = new java.util.ArrayList<>();
++        java.util.Set<String> row2Set = new java.util.HashSet<>(java.util.Arrays.asList(EXTRA_KEYS_ROW_2_ORDER));
++        java.util.Set<String> seen = new java.util.HashSet<>();
++        for (String key : orderedKeys) {
++            if (key == null || !seen.add(key)) continue;
++            if (row2Set.contains(key)) row2Keys.add(key);
++            else row1Keys.add(key);
++        }
++        String row1 = row1Keys.isEmpty() ? null : "[" + joinExtraKeys(row1Keys) + "]";
++        String row2 = row2Keys.isEmpty() ? null : "[" + joinExtraKeys(row2Keys) + "]";
++        if (row1 == null && row2 == null) return "[]";
++        if (row1 == null) return "[" + row2 + "]";
++        if (row2 == null) return "[" + row1 + "]";
++        return "[" + row1 + ", " + row2 + "]";
++    }
++
++    private static String joinExtraKeys(@NonNull java.util.List<String> keys) {
++        StringBuilder sb = new StringBuilder();
++        for (int i = 0; i < keys.size(); i++) {
++            if (i > 0) sb.append(", ");
++            sb.append('\'').append(keys.get(i)).append('\'');
++        }
++        return sb.toString();
++    }
++
+     /** Compose an extra-keys property value from a set of enabled keys. */
+     @NonNull
+     public static String composeExtraKeysValue(@NonNull Set<String> enabledKeys) {
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+index f8b943c..cdd4e2b 100644
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+@@ -43,6 +43,9 @@ public class NobiTabsController {
+     private static final String PREFS_NAME = "nobi_tabs";
+     private static final String PREF_KEY_ORDER = "tab_order";
+     private static final String PREF_KEY_NAMES = "tab_names";
++    // v6 (9/10): per-tab note + colour, same "handle<TAB>value" encoding.
++    private static final String PREF_KEY_NOTES = "tab_notes";
++    private static final String PREF_KEY_COLORS = "tab_colors";
+ 
+     private static final int COLOR_TAB_ACTIVE_BG = 0xFF1B2452;
+     private static final int COLOR_TAB_INACTIVE_BG = 0xFF101736;
+@@ -78,6 +81,76 @@ public class NobiTabsController {
+         }
+     }
+ 
++    /** Sessions in tab display order (copy). Used by the session tools dialogs. */
++    public List<TerminalSession> getOrderedSessions() {
++        return new ArrayList<>(mOrderedSessions);
++    }
++
++    /** Display label for a session (custom name, session name, title, index). */
++    public String getTabLabel(TerminalSession session) {
++        return resolveTabLabel(session, mOrderedSessions.indexOf(session));
++    }
++
++    // v6 (9/10): notes + colours, shared with TermuxActivity's dialogs.
++    public static Map<String, String> loadTabNotes(Context context) {
++        Map<String, String> notes = new HashMap<>();
++        Set<String> saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
++            .getStringSet(PREF_KEY_NOTES, null);
++        if (saved != null) {
++            for (String entry : saved) {
++                int separator = entry.indexOf('\t');
++                if (separator > 0)
++                    notes.put(entry.substring(0, separator), entry.substring(separator + 1));
++            }
++        }
++        return notes;
++    }
++
++    public static void saveTabNote(Context context, String handle, String note) {
++        Map<String, String> notes = loadTabNotes(context);
++        if (note == null || note.isEmpty())
++            notes.remove(handle);
++        else
++            notes.put(handle, note);
++        Set<String> entries = new HashSet<>();
++        for (Map.Entry<String, String> entry : notes.entrySet())
++            entries.add(entry.getKey() + "\t" + entry.getValue());
++        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
++            .putStringSet(PREF_KEY_NOTES, entries).apply();
++    }
++
++    public static Map<String, Integer> loadTabColors(Context context) {
++        Map<String, Integer> colors = new HashMap<>();
++        Set<String> saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
++            .getStringSet(PREF_KEY_COLORS, null);
++        if (saved != null) {
++            for (String entry : saved) {
++                int separator = entry.indexOf('\t');
++                if (separator > 0) {
++                    try {
++                        colors.put(entry.substring(0, separator),
++                            Integer.parseInt(entry.substring(separator + 1)));
++                    } catch (NumberFormatException ignored) {
++                    }
++                }
++            }
++        }
++        return colors;
++    }
++
++    public static void saveTabColor(Context context, String handle, Integer color) {
++        Map<String, Integer> colors = loadTabColors(context);
++        if (color == null)
++            colors.remove(handle);
++        else
++            colors.put(handle, color);
++        Set<String> entries = new HashSet<>();
++        for (Map.Entry<String, Integer> entry : colors.entrySet())
++            entries.add(entry.getKey() + "\t" + entry.getValue());
++        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
++            .putStringSet(PREF_KEY_COLORS, entries).apply();
++    }
++
+     /** Rebuild the strip from the service's current session list. Safe to call at any time. */
+     public void refreshTabs() {
+         if (mTabsContainer == null) return;
+@@ -173,6 +246,20 @@ public class NobiTabsController {
+                 }
+             });
+         }
++
++        // v6 (9): active tab's note under the tabs bar (hidden when empty).
++        TextView noteView = mActivity.findViewById(R.id.nobi_tab_note);
++        if (noteView != null) {
++            String note = null;
++            if (currentSession != null)
++                note = loadTabNotes(mActivity).get(currentSession.mHandle);
++            if (note == null || note.isEmpty()) {
++                noteView.setVisibility(View.GONE);
++            } else {
++                noteView.setText(note);
++                noteView.setVisibility(View.VISIBLE);
++            }
++        }
+     }
+ 
+     private View createTabView(final TerminalSession session, int displayIndex, boolean isActive) {
+@@ -187,6 +274,17 @@ public class NobiTabsController {
+         tabParams.setMargins(0, dp(4), dp(4), dp(4));
+         tab.setLayoutParams(tabParams);
+ 
++        // v6 (10): per-tab colour dot, shown before the title when set.
++        Integer tabColor = loadTabColors(mActivity).get(session.mHandle);
++        if (tabColor != null) {
++            View dot = new View(mActivity);
++            dot.setBackgroundColor(tabColor);
++            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(8), dp(8));
++            dotParams.setMargins(0, 0, dp(6), 0);
++            dot.setLayoutParams(dotParams);
++            tab.addView(dot);
++        }
++
+         TextView titleView = new TextView(mActivity);
+         titleView.setText(resolveTabLabel(session, displayIndex));
+         titleView.setSingleLine(true);
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/TermuxTerminalSessionActivityClient.java b/termux-app/app/src/main/java/com/termux/app/terminal/TermuxTerminalSessionActivityClient.java
+index b1e554a..3cea346 100644
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/TermuxTerminalSessionActivityClient.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/TermuxTerminalSessionActivityClient.java
+@@ -385,10 +385,43 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
+             TerminalSession newTerminalSession = newTermuxSession.getTerminalSession();
+             setCurrentSession(newTerminalSession);
+ 
++            // v6 (6): a named session auto-runs its configured startup command.
++            if (sessionName != null) {
++                String startupCommand = TermuxActivity.findStartupCommand(mActivity, sessionName);
++                if (startupCommand != null && !startupCommand.isEmpty() && newTerminalSession.isRunning()) {
++                    byte[] bytes = (startupCommand + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
++                    newTerminalSession.write(bytes, 0, bytes.length);
++                }
++            }
++
+             mActivity.getDrawer().closeDrawers();
+         }
+     }
+ 
++    /**
++     * v6 (1): like {@link #addNewSession(boolean, String)} but in an explicit
++     * working directory, for session restore. Startup commands are NOT
++     * applied here (a restored session resumes where it was, it does not
++     * re-run its open command). Returns false when nothing was created.
++     */
++    public boolean addNewSessionWithCwd(String workingDirectory, String sessionName) {
++        TermuxService service = mActivity.getTermuxService();
++        if (service == null) return false;
++
++        if (service.getTermuxSessionsSize() >= MAX_SESSIONS) return false;
++
++        String cwd = workingDirectory;
++        if (cwd == null || cwd.isEmpty() || !new File(cwd).isDirectory())
++            cwd = mActivity.getProperties().getDefaultWorkingDirectory();
++
++        TermuxSession newTermuxSession = service.createTermuxSession(null, null, null, cwd, false, sessionName);
++        if (newTermuxSession == null) return false;
++
++        TerminalSession newTerminalSession = newTermuxSession.getTerminalSession();
++        setCurrentSession(newTerminalSession);
++        return true;
++    }
++
+     public void setCurrentStoredSession() {
+         TerminalSession currentSession = mActivity.getCurrentSession();
+         if (currentSession != null)
+diff --git a/termux-app/app/src/main/res/drawable/ic_new_window.xml b/termux-app/app/src/main/res/drawable/ic_new_window.xml
+new file mode 100644
+index 0000000..7c5e983
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_new_window.xml
+@@ -0,0 +1,18 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++
++    <!-- v6 "New Window" drawer icon: two overlapping windows (back window
++         dimmed, front window solid). Drawer icons are tinted by the theme. -->
++    <path
++        android:fillColor="#FFF"
++        android:fillAlpha="0.55"
++        android:pathData="M9,3 L21,3 L21,15 L9,15 Z" />
++
++    <path
++        android:fillColor="#FFF"
++        android:pathData="M3,5 L15,5 L15,17 L3,17 Z" />
++
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_search.xml b/termux-app/app/src/main/res/drawable/ic_nobi_search.xml
+new file mode 100644
+index 0000000..b5cd4a4
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_search.xml
+@@ -0,0 +1,10 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v6: magnifier for Find in Terminal. -->
++    <path
++        android:fillColor="#000000"
++        android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_server.xml b/termux-app/app/src/main/res/drawable/ic_nobi_server.xml
+new file mode 100644
+index 0000000..75ead40
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_server.xml
+@@ -0,0 +1,10 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v6: server stack for Start Server. -->
++    <path
++        android:fillColor="#000000"
++        android:pathData="M4,3h16c1.1,0 2,0.9 2,2v4c0,1.1 -0.9,2 -2,2H4c-1.1,0 -2,-0.9 -2,-2V5c0,-1.1 0.9,-2 2,-2zM4,13h16c1.1,0 2,0.9 2,2v4c0,1.1 -0.9,2 -2,2H4c-1.1,0 -2,-0.9 -2,-2v-4c0,-1.1 0.9,-2 2,-2zM6,7h2v2H6V7zM6,17h2v2H6v-2z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_tools.xml b/termux-app/app/src/main/res/drawable/ic_nobi_tools.xml
+new file mode 100644
+index 0000000..8cf4dff
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_tools.xml
+@@ -0,0 +1,10 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v6: sliders for Session Tools. -->
++    <path
++        android:fillColor="#000000"
++        android:pathData="M3,5h14v2H3V5zM3,11h8v2H3v-2zM3,17h11v2H3v-2zM19,4c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM13,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM16,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/ic_service_notification.xml b/termux-app/app/src/main/res/drawable/ic_service_notification.xml
+index 205dcfc..68dad6f 100644
+--- a/termux-app/app/src/main/res/drawable/ic_service_notification.xml
++++ b/termux-app/app/src/main/res/drawable/ic_service_notification.xml
+@@ -4,8 +4,9 @@
+     android:viewportWidth="24"
+     android:viewportHeight="24">
+     <!--
+-        Updated notification icon compliant with system icons guidelines
+-        https://material.io/design/iconography/system-icons.html
++        v6: notification icon is the NobiTerminal neon "N" mark (white
++        silhouette — the system tints small icons). Replaces the old Termux
++        chevron logo. Same N path as ic_foreground, scaled 108 -> 24.
+     -->
+ 
+     <group>
+@@ -13,11 +14,7 @@
+             android:pathData="M0,0h24v24h-24z"/>
+ 
+         <path
+-            android:pathData="M5,4H2L8,12L2,20H5L11,12L5,4Z"
+-            android:fillColor="#ffffff"/>
+-
+-        <path
+-            android:pathData="M13,18H22V20H13V18Z"
++            android:pathData="M6.67,17.33 L6.67,6.67 L8.89,6.67 L14.67,13.78 L14.67,6.67 L17.33,6.67 L17.33,17.33 L15.11,17.33 L9.33,10.22 L9.33,17.33 Z"
+             android:fillColor="#ffffff"/>
+ 
+     </group>
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+index ed84b41..f8f3767 100644
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -39,6 +39,22 @@
+             android:contentDescription="New session" />
+     </LinearLayout>
+ 
++    <!-- v6 (9): active session's note, shown under the tabs bar when set. -->
++    <TextView
++        android:id="@+id/nobi_tab_note"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:visibility="gone"
++        android:paddingStart="12dp"
++        android:paddingEnd="12dp"
++        android:paddingTop="2dp"
++        android:paddingBottom="4dp"
++        android:background="#FF0A0F24"
++        android:textColor="#FF9AA5D9"
++        android:textSize="12sp"
++        android:maxLines="1"
++        android:ellipsize="end" />
++
+     <RelativeLayout
+         android:id="@+id/activity_termux_root_relative_layout"
+         android:layout_width="match_parent"
+@@ -100,7 +116,7 @@
+                     android:paddingTop="8dp">
+ 
+                     <LinearLayout
+-                        android:id="@+id/nobi_menu_terminal"
++                        android:id="@+id/nobi_menu_new_window"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -114,14 +130,14 @@
+                             android:layout_width="24dp"
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+-                            android:src="@drawable/ic_nobi_terminal"
++                            android:src="@drawable/ic_new_window"
+                             app:tint="?attr/termuxActivityDrawerImageTint" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+                             android:layout_marginStart="14dp"
+-                            android:text="@string/nobi_menu_terminal"
++                            android:text="@string/nobi_menu_new_window"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+                     </LinearLayout>
+@@ -180,6 +196,115 @@
+                             android:textSize="15sp" />
+                     </LinearLayout>
+ 
++                    <!-- v6 batch 1-16: terminal tools. -->
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_quick_commands"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_terminal"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_quick_commands"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_find"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_search"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_find"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_server"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_server"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_server"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/nobi_menu_session_tools"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:gravity="center_vertical"
++                        android:orientation="horizontal"
++                        android:paddingStart="20dp"
++                        android:paddingTop="13dp"
++                        android:paddingEnd="16dp"
++                        android:paddingBottom="13dp">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:contentDescription="@null"
++                            android:src="@drawable/ic_nobi_tools"
++                            app:tint="?attr/termuxActivityDrawerImageTint" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:layout_marginStart="14dp"
++                            android:text="@string/nobi_menu_session_tools"
++                            android:textColor="?attr/termuxActivityDrawerImageTint"
++                            android:textSize="15sp" />
++                    </LinearLayout>
++
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_settings"
+                         android:layout_width="match_parent"
+diff --git a/termux-app/app/src/main/res/mipmap-anydpi/ic_launcher.xml b/termux-app/app/src/main/res/mipmap-anydpi/ic_launcher.xml
+new file mode 100644
+index 0000000..ebcc3f0
+--- /dev/null
++++ b/termux-app/app/src/main/res/mipmap-anydpi/ic_launcher.xml
+@@ -0,0 +1,27 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="108dp"
++    android:height="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++
++    <!-- v6: pre-Android-8 fallback launcher icon (the adaptive icon in
++         mipmap-anydpi-v26 covers API 26+). Same navy background + neon "N"
++         as ic_foreground, so the old Termux PNGs are gone everywhere. -->
++
++    <path
++        android:fillColor="#070B1F"
++        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
++
++    <group
++        android:translateX="3"
++        android:translateY="3">
++        <path
++            android:fillColor="#8B5CF6"
++            android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++    </group>
++
++    <path
++        android:fillColor="#22D3EE"
++        android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++
++</vector>
+diff --git a/termux-app/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml b/termux-app/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+new file mode 100644
+index 0000000..189b9c0
+--- /dev/null
++++ b/termux-app/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+@@ -0,0 +1,32 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="108dp"
++    android:height="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++
++    <!-- v6: pre-Android-8 fallback ROUND launcher icon. Circle-clipped navy
++         background + neon "N", matching ic_launcher.xml. -->
++
++    <group>
++        <clip-path
++            android:pathData="M54,54 m-54,0 a54,54 0 1,0 108,0 a54,54 0 1,0 -108,0" />
++
++        <path
++            android:fillColor="#070B1F"
++            android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
++
++        <group
++            android:translateX="3"
++            android:translateY="3">
++            <path
++                android:fillColor="#8B5CF6"
++                android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++        </group>
++
++        <path
++            android:fillColor="#22D3EE"
++            android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++
++    </group>
++
++</vector>
+diff --git a/termux-app/app/src/main/res/values/nobi_drawer_strings.xml b/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
+index fb87bf6..50458cf 100644
+--- a/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
++++ b/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
+@@ -1,8 +1,13 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="nobi_menu_terminal">Terminal</string>
++    <string name="nobi_menu_new_window">New Window</string>
+     <string name="nobi_menu_nobicode">Nobi Code</string>
+     <string name="nobi_menu_new_session">New Session</string>
+     <string name="nobi_menu_settings">Settings</string>
+     <string name="nobi_menu_exit">Exit</string>
++    <!-- v6 batch 1-16 drawer rows. -->
++    <string name="nobi_menu_quick_commands">Quick Commands</string>
++    <string name="nobi_menu_find">Find in Terminal</string>
++    <string name="nobi_menu_server">Start Server</string>
++    <string name="nobi_menu_session_tools">Session Tools</string>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/nobi_settings_arrays.xml b/termux-app/app/src/main/res/values/nobi_settings_arrays.xml
+index 3c2f44e..f86120e 100644
+--- a/termux-app/app/src/main/res/values/nobi_settings_arrays.xml
++++ b/termux-app/app/src/main/res/values/nobi_settings_arrays.xml
+@@ -9,6 +9,9 @@
+         <item>Solarized Dark</item>
+         <item>One Dark</item>
+         <item>Midnight Purple</item>
++        <item>Nord</item>
++        <item>Monokai</item>
++        <item>Gruvbox</item>
+         <item>Default</item>
+     </string-array>
+ 
+@@ -20,6 +23,9 @@
+         <item>solarized_dark</item>
+         <item>one_dark</item>
+         <item>midnight_purple</item>
++        <item>nord</item>
++        <item>monokai</item>
++        <item>gruvbox</item>
+         <item>default</item>
+     </string-array>
+ 
+diff --git a/termux-app/app/src/main/res/values/nobi_tools_strings.xml b/termux-app/app/src/main/res/values/nobi_tools_strings.xml
+new file mode 100644
+index 0000000..d49bb1f
+--- /dev/null
++++ b/termux-app/app/src/main/res/values/nobi_tools_strings.xml
+@@ -0,0 +1,80 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- v6 batch 1-16: terminal tools dialogs. -->
++    <string name="nobi_no_running_session">No running session</string>
++    <string name="nobi_add">Add</string>
++    <string name="nobi_save">Save</string>
++    <string name="nobi_delete">Delete</string>
++    <string name="nobi_clear">Clear</string>
++    <string name="nobi_exit">Exit</string>
++    <string name="nobi_unlock">Unlock</string>
++
++    <string name="nobi_quick_commands_title">Quick Commands</string>
++    <string name="nobi_quick_commands_empty">No saved commands yet</string>
++    <string name="nobi_quick_command_new_title">New quick command</string>
++    <string name="nobi_quick_command_saved">Quick command saved</string>
++    <string name="nobi_quick_command_delete_title">Delete quick command</string>
++    <string name="nobi_quick_command_deleted">Quick command deleted</string>
++
++    <string name="nobi_session_tools_title">Session Tools</string>
++    <string name="nobi_session_notes_title">Session Notes</string>
++    <string name="nobi_session_note_title">Session note</string>
++    <string name="nobi_tab_colours_title">Tab Colours</string>
++    <string name="nobi_tab_colour_pick_title">Pick tab colour</string>
++    <string name="nobi_colour_none">None</string>
++    <string name="nobi_colour_cyan">Cyan</string>
++    <string name="nobi_colour_violet">Violet</string>
++    <string name="nobi_colour_green">Green</string>
++    <string name="nobi_colour_amber">Amber</string>
++    <string name="nobi_colour_red">Red</string>
++    <string name="nobi_colour_pink">Pink</string>
++    <string name="nobi_colour_blue">Blue</string>
++    <string name="nobi_colour_grey">Grey</string>
++
++    <string name="nobi_startup_commands_title">Startup Commands</string>
++    <string name="nobi_startup_add_title">Add startup command</string>
++    <string name="nobi_startup_name_hint">Session name</string>
++    <string name="nobi_startup_command_hint">Command to run on open</string>
++    <string name="nobi_startup_command_saved">Startup command saved</string>
++    <string name="nobi_startup_command_deleted">Startup command deleted</string>
++
++    <string name="nobi_home_shortcut_title">Add Home Shortcut</string>
++    <string name="nobi_shortcut_new_session">New session shortcut</string>
++    <string name="nobi_shortcut_command">Command shortcut</string>
++    <string name="nobi_shortcut_command_title">Shortcut command</string>
++    <string name="nobi_shortcut_unsupported">Home shortcuts are not supported on this device</string>
++    <string name="nobi_shortcut_added">Shortcut added — confirm on the home screen</string>
++
++    <string name="nobi_server_title">Start Server</string>
++    <string name="nobi_server_web">Web server (port 8080)</string>
++    <string name="nobi_server_ssh">SSH server (port 8022)</string>
++    <string name="nobi_server_web_started">Web server on port 8080</string>
++    <string name="nobi_server_ssh_started">SSH server on port 8022 — set a password with passwd first</string>
++
++    <string name="nobi_find_title">Find in Terminal</string>
++    <string name="nobi_find_hint">Search text</string>
++    <string name="nobi_find_previous">Previous</string>
++    <string name="nobi_find_next">Next</string>
++    <string name="nobi_find_no_match">No match</string>
++
++    <string name="nobi_app_locked_title">App locked</string>
++    <string name="nobi_app_locked_message">Enter PIN to open NobiTerminal</string>
++    <string name="nobi_wrong_pin">Wrong PIN</string>
++    <string name="nobi_app_lock_set_title">Set app lock PIN</string>
++    <string name="nobi_app_lock_pin_hint">PIN (numbers)</string>
++    <string name="nobi_app_lock_confirm_hint">Confirm PIN</string>
++    <string name="nobi_app_lock_pin_mismatch">PINs do not match</string>
++    <string name="nobi_app_lock_pin_set">App lock PIN set</string>
++    <string name="nobi_app_lock_change_pin">Change PIN</string>
++    <string name="nobi_app_lock_remove">Remove lock</string>
++    <string name="nobi_app_lock_current_title">Enter current PIN</string>
++    <string name="nobi_app_lock_removed">App lock removed</string>
++
++    <string name="nobi_extra_keys_reorder_title">Reorder keys</string>
++    <string name="nobi_extra_keys_reorder_empty">No keys to reorder — enable some keys first</string>
++
++    <string name="nobi_share_choice_title">Shared file saved</string>
++    <string name="nobi_share_type_path">Type path into terminal</string>
++    <string name="nobi_share_open_editor">Open in Nobi Code</string>
++    <string name="nobi_share_done">Done</string>
++</resources>
+diff --git a/termux-app/app/src/main/res/values/strings.xml b/termux-app/app/src/main/res/values/strings.xml
+index 916a280..3cd7985 100644
+--- a/termux-app/app/src/main/res/values/strings.xml
++++ b/termux-app/app/src/main/res/values/strings.xml
+@@ -255,6 +255,14 @@
+ 
+     <string name="nobi_extra_keys_preference_title">Extra Keys Bar</string>
+     <string name="nobi_extra_keys_preference_summary">Choose which keys are shown above the keyboard</string>
++    <string name="nobi_extra_keys_reorder_preference_title">Reorder keys</string>
++    <string name="nobi_extra_keys_reorder_preference_summary">Change the order of keys on the bar</string>
++
++    <!-- v6 batch 1-16: wake lock + app lock preferences. -->
++    <string name="nobi_wake_lock_preference_title">Keep sessions alive</string>
++    <string name="nobi_wake_lock_preference_summary">Hold a wake lock so background sessions keep running when the phone sleeps</string>
++    <string name="nobi_app_lock_preference_title">App Lock</string>
++    <string name="nobi_app_lock_preference_summary">Ask for a PIN when opening the app</string>
+     <string name="nobi_extra_keys_preset_title">Preset</string>
+     <string name="nobi_extra_keys_keys_title">Keys</string>
+     <string name="nobi_key_drawer_title">Sidebar (☰)</string>
+diff --git a/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml b/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
+index eb0e09e..7c16384 100644
+--- a/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
++++ b/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
+@@ -8,6 +8,12 @@
+         app:entryValues="@array/nobi_extra_keys_preset_entry_values"
+         app:defaultValue="custom"/>
+ 
++    <Preference
++        app:key="nobi_extra_keys_reorder"
++        app:title="@string/nobi_extra_keys_reorder_preference_title"
++        app:summary="@string/nobi_extra_keys_reorder_preference_summary"
++        app:persistent="false"/>
++
+     <PreferenceCategory
+         app:title="@string/nobi_extra_keys_keys_title">
+ 
+diff --git a/termux-app/app/src/main/res/xml/root_preferences.xml b/termux-app/app/src/main/res/xml/root_preferences.xml
+index 65624cb..7ac1531 100644
+--- a/termux-app/app/src/main/res/xml/root_preferences.xml
++++ b/termux-app/app/src/main/res/xml/root_preferences.xml
+@@ -80,6 +80,18 @@
+             app:summary="@string/nobi_extra_keys_preference_summary"
+             app:fragment="com.termux.app.fragments.settings.nobi.ExtraKeysPreferencesFragment"/>
+ 
++        <CheckBoxPreference
++            app:key="nobi_wake_lock"
++            app:title="@string/nobi_wake_lock_preference_title"
++            app:summary="@string/nobi_wake_lock_preference_summary"
++            app:defaultValue="false"/>
++
++        <Preference
++            app:key="nobi_app_lock"
++            app:title="@string/nobi_app_lock_preference_title"
++            app:summary="@string/nobi_app_lock_preference_summary"
++            app:persistent="false"/>
++
+     </PreferenceCategory>
+ 
+ </PreferenceScreen>
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/FileListAdapter.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/FileListAdapter.kt
+index 0e12423..35d4921 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/FileListAdapter.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/FileListAdapter.kt
+@@ -16,7 +16,10 @@ class FileListAdapter(
+     private var items: List<FileItem> = emptyList(),
+     private var highlightUri: Uri? = null,
+     private val onItemClick: (FileItem) -> Unit,
+-    private val onItemLongClick: (FileItem) -> Unit
++    private val onItemLongClick: (FileItem) -> Unit,
++    // v6 tree sidebar: tap on a directory's arrow expands/collapses it inline
++    // (row tap still navigates, as before). Null = no tree behavior.
++    private val onArrowClick: ((FileItem) -> Unit)? = null
+ ) : RecyclerView.Adapter<FileListAdapter.FileViewHolder>() {
+ 
+     fun submitList(newItems: List<FileItem>) {
+@@ -45,10 +48,25 @@ class FileListAdapter(
+         private val fileIcon: ImageView = itemView.findViewById(R.id.fileIcon)
+         private val fileName: TextView = itemView.findViewById(R.id.fileName)
+         private val folderArrow: ImageView = itemView.findViewById(R.id.folderArrow)
++        // Layout's own start padding (18dp) — depth indent adds on top of it.
++        // Captured once: bind() runs on recycled holders, so reading the
++        // live padding here would compound the indent on every rebind.
++        private val baseStartPadding: Int = itemView.paddingStart
+ 
+         fun bind(item: FileItem) {
+             fileName.text = item.name
+ 
++            // v6 tree sidebar: indent by depth; expanded dirs point down.
++            // (Named indentDensity: bind() already declares `density` below
++            // for the highlight margins — a second `density` would not compile.)
++            val indentDensity = itemView.resources.displayMetrics.density
++            itemView.setPaddingRelative(
++                baseStartPadding + (item.depth * 18 * indentDensity).toInt(),
++                itemView.paddingTop,
++                itemView.paddingEnd,
++                itemView.paddingBottom
++            )
++
+             if (item.isParent) {
+                 fileIcon.setImageResource(R.drawable.ic_folder_parent)
+                 fileIcon.colorFilter = null
+@@ -58,10 +76,15 @@ class FileListAdapter(
+                 fileIcon.setImageResource(FileIconProvider.getFolderIcon(item.name, false))
+                 fileIcon.colorFilter = null
+                 folderArrow.visibility = View.VISIBLE
++                folderArrow.rotation = if (item.isExpanded) 90f else 0f
++                folderArrow.setOnClickListener { onArrowClick?.invoke(item) }
+                 fileName.setTextColor(ContextCompat.getColor(itemView.context, R.color.on_surface))
+             } else {
+                 fileIcon.setImageResource(FileIconProvider.getFileIcon(item.name))
+                 fileIcon.colorFilter = null
++                // v6 fix: recycled dir holders used to leak a visible arrow
++                // onto file rows (the file branch never hid it).
++                folderArrow.visibility = View.GONE
+                 fileName.setTextColor(ContextCompat.getColor(itemView.context, R.color.on_surface))
+             }
+ 
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+index eb95187..f04d4a9 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+@@ -128,6 +128,11 @@ class MainActivity : AppCompatActivity() {
+     private val folderBackStack = Stack<DocumentFile>()
+     private val folderCache = LruCache<String, List<FileItem>>(60)
+     private lateinit var fileAdapter: FileListAdapter
++    // v6 tree sidebar: folders expanded inline in the drawer (uri strings),
++    // the current folder's flat base list, and in-flight expansion fetches.
++    private val expandedFolderUris = mutableSetOf<String>()
++    private var lastDrawerBase: List<FileItem> = emptyList()
++    private val fetchingExpansion = mutableSetOf<String>()
+ 
+     private val openFolderLauncher = registerForActivityResult(
+         ActivityResultContracts.OpenDocumentTree()
+@@ -183,11 +188,32 @@ class MainActivity : AppCompatActivity() {
+ 
+         restoreSessionState()
+ 
++        // v6 (15): file shared from another app (via FileReceiverActivity).
++        intent.getStringExtra("nobi_open_file_path")?.let { sharedPath ->
++            openSharedFileInTab(sharedPath)
++        }
++
+         binding.toolbar.post {
+             updateRunButtonVisibility()
+         }
+     }
+ 
++    // v6 (15): open a plain filesystem file (shared from another app) in a
++    // tab. Files outside the SAF project tree open via DocumentFile.fromFile;
++    // save goes through ContentResolver, which handles file:// URIs.
++    private fun openSharedFileInTab(sharedPath: String) {
++        try {
++            val file = java.io.File(sharedPath)
++            if (!file.isFile) {
++                Toast.makeText(this, "Shared file not found", Toast.LENGTH_SHORT).show()
++                return
++            }
++            openFileInTab(DocumentFile.fromFile(file))
++        } catch (e: Exception) {
++            Toast.makeText(this, "Could not open shared file", Toast.LENGTH_SHORT).show()
++        }
++    }
++
+     private fun setupFullScreenAndInsets() {
+         WindowCompat.setDecorFitsSystemWindows(window, false)
+ 
+@@ -389,6 +415,10 @@ class MainActivity : AppCompatActivity() {
+                     showGotoLineDialog()
+                     true
+                 }
++                R.id.action_outline -> {
++                    showCodeOutline()
++                    true
++                }
+                 R.id.action_settings -> {
+                     startActivity(Intent(this, SettingsActivity::class.java))
+                     true
+@@ -430,6 +460,7 @@ R.id.action_markdown_preview -> {
+         binding.quickOpenBtn.setOnClickListener { showQuickOpenDialog() }
+         binding.fileRecyclerView.layoutManager = LinearLayoutManager(this)
+         fileAdapter = FileListAdapter(
++            onArrowClick = { item -> toggleFolderExpansion(item) },
+             onItemClick = { item ->
+                 if (item.isParent) {
+                     if (folderBackStack.isNotEmpty()) {
+@@ -2006,15 +2037,8 @@ R.id.action_markdown_preview -> {
+ 
+         val cached = folderCache.get(folderKey)
+         if (cached != null) {
+-            val visibleCached = filterHiddenFiles(cached)
+-            val displayList = if (isNotAtRoot) {
+-                listOf(FileItem(getString(R.string.parent_folder), folder.uri, isDirectory = true, isParent = true)) + visibleCached
+-            } else {
+-                visibleCached
+-            }
+-            fileAdapter.submitList(displayList)
+-            binding.emptyFolderText.visibility = if (displayList.isEmpty()) View.VISIBLE else View.GONE
+-            binding.drawerLoadingProgress.visibility = View.GONE
++            lastDrawerBase = filterHiddenFiles(cached)
++            submitDrawerList(isNotAtRoot)
+             return
+         }
+ 
+@@ -2025,17 +2049,83 @@ R.id.action_markdown_preview -> {
+             }
+ 
+             folderCache.put(folderKey, resultItems)
++            lastDrawerBase = filterHiddenFiles(resultItems)
++            submitDrawerList(isNotAtRoot)
++        }
++    }
++
++    /** v6 tree sidebar: submit the drawer list with inline expansion applied.
++     * The ".." parent row (when drilled in) always stays first, unexpanded. */
++    private fun submitDrawerList(isNotAtRoot: Boolean) {
++        val displayList = mutableListOf<FileItem>()
++        if (isNotAtRoot) {
++            val folder = currentFolder
++            if (folder != null) {
++                displayList.add(FileItem(getString(R.string.parent_folder), folder.uri, isDirectory = true, isParent = true))
++            }
++        }
++        displayList.addAll(flattenDrawerTree(lastDrawerBase, 0))
++        fileAdapter.submitList(displayList)
++        binding.emptyFolderText.visibility = if (displayList.isEmpty()) View.VISIBLE else View.GONE
++        binding.drawerLoadingProgress.visibility = View.GONE
++    }
++
++    /** v6: flatten a folder list into tree rows. Expanded directories
++     * contribute their (cached, hidden-filtered) children right below them,
++     * indented one level deeper; uncached expansions are fetched async. */
++    private fun flattenDrawerTree(items: List<FileItem>, depth: Int): List<FileItem> {
++        val out = mutableListOf<FileItem>()
++        for (item in items) {
++            val expanded = !item.isParent && item.isDirectory &&
++                expandedFolderUris.contains(item.uri.toString())
++            out.add(item.copy(depth = depth, isExpanded = expanded))
++            if (expanded) {
++                val children = folderCache.get(item.uri.toString())
++                if (children != null) {
++                    out.addAll(flattenDrawerTree(filterHiddenFiles(children), depth + 1))
++                } else {
++                    fetchExpansionChildren(item)
++                }
++            }
++        }
++        return out
++    }
+ 
+-            val visibleItems = filterHiddenFiles(resultItems)
+-            val finalDisplayList = if (isNotAtRoot) {
+-                listOf(FileItem(getString(R.string.parent_folder), folder.uri, isDirectory = true, isParent = true)) + visibleItems
+-            } else {
+-                visibleItems
++    /** v6: fetch one expanded folder's children (cache-first callers already
++     * handled the cached case), then re-submit the drawer list. */
++    private fun fetchExpansionChildren(item: FileItem) {
++        val key = item.uri.toString()
++        if (!fetchingExpansion.add(key)) return
++        val treeUri = rootDocumentFile?.uri ?: currentFolder?.uri
++        val doc = DocumentFile.fromTreeUri(this, item.uri)
++        if (treeUri == null || doc == null) {
++            fetchingExpansion.remove(key)
++            return
++        }
++        lifecycleScope.launch {
++            val children = withContext(Dispatchers.IO) {
++                fetchFolderItemsOnly(doc, treeUri)
+             }
++            folderCache.put(key, children)
++            fetchingExpansion.remove(key)
++            submitDrawerList(folderBackStack.isNotEmpty())
++        }
++    }
+ 
+-            binding.drawerLoadingProgress.visibility = View.GONE
+-            fileAdapter.submitList(finalDisplayList)
+-            binding.emptyFolderText.visibility = if (finalDisplayList.isEmpty()) View.VISIBLE else View.GONE
++    /** v6: drawer folder arrow toggles inline expansion. Row tap still
++     * navigates into the folder, as before. */
++    private fun toggleFolderExpansion(item: FileItem) {
++        val key = item.uri.toString()
++        if (expandedFolderUris.contains(key)) {
++            expandedFolderUris.remove(key)
++            submitDrawerList(folderBackStack.isNotEmpty())
++            return
++        }
++        expandedFolderUris.add(key)
++        if (folderCache.get(key) != null) {
++            submitDrawerList(folderBackStack.isNotEmpty())
++        } else {
++            fetchExpansionChildren(item)
+         }
+     }
+ 
+@@ -4844,6 +4934,16 @@ R.id.action_markdown_preview -> {
+             }
+         }
+ 
++        // v6 (12): format on save — trailing whitespace + final newline for
++        // every language, bracket reindent for brace languages only (Python /
++        // YAML / shell indentation is semantic, never reindented).
++        if (prefs.formatOnSave) {
++            val ext = if (activeTabIndex in openTabs.indices) {
++                openTabs[activeTabIndex].name.substringAfterLast('.', "").lowercase()
++            } else ""
++            textToSave = formatCodeForSave(textToSave, ext)
++        }
++
+         if (tab.uri != null) {
+             try {
+                 contentResolver.openOutputStream(tab.uri!!, "wt")?.use { out ->
+@@ -4871,6 +4971,99 @@ R.id.action_markdown_preview -> {
+         }
+     }
+ 
++    // v6 (12): conservative formatter. Brace languages get bracket-depth
++    // reindent (4 spaces, strings/comments/block comments skipped); every
++    // language gets trailing-whitespace trim + exactly one final newline.
++    private fun formatCodeForSave(text: String, ext: String): String {
++        if (text.isEmpty()) return text
++        val braceLangs = setOf(
++            "kt", "kts", "java", "js", "ts", "c", "h", "cpp", "cc", "css", "json"
++        )
++        val lines = text.split('\n')
++        if (ext.lowercase() !in braceLangs) {
++            return lines.joinToString("\n") { it.trimEnd() }.trimEnd('\n') + "\n"
++        }
++        val out = ArrayList<String>()
++        var depth = 0
++        var inBlockComment = false
++        for (raw in lines) {
++            val trimmed = raw.trim()
++            var lineDelta = 0
++            var startsWithCloser = false
++            var firstSignificant = true
++            var inString = false
++            var stringDelim = '"'
++            var inChar = false
++            var i = 0
++            while (i < raw.length) {
++                val c = raw[i]
++                if (inBlockComment) {
++                    if (c == '*' && i + 1 < raw.length && raw[i + 1] == '/') {
++                        inBlockComment = false
++                        i += 2
++                    } else {
++                        i++
++                    }
++                    continue
++                }
++                if (inString) {
++                    if (c == '\\' && i + 1 < raw.length) {
++                        i += 2
++                        continue
++                    }
++                    if (c == stringDelim) inString = false
++                    i++
++                    continue
++                }
++                if (inChar) {
++                    if (c == '\\' && i + 1 < raw.length) {
++                        i += 2
++                        continue
++                    }
++                    if (c == '\'') inChar = false
++                    i++
++                    continue
++                }
++                if (c == '/' && i + 1 < raw.length && raw[i + 1] == '/') break
++                if (c == '/' && i + 1 < raw.length && raw[i + 1] == '*') {
++                    inBlockComment = true
++                    i += 2
++                    continue
++                }
++                if (c == '"') {
++                    inString = true
++                    stringDelim = '"'
++                    i++
++                    firstSignificant = false
++                    continue
++                }
++                if (c == '\'') {
++                    inChar = true
++                    i++
++                    firstSignificant = false
++                    continue
++                }
++                if (c == ' ' || c == '\t') {
++                    i++
++                    continue
++                }
++                if (firstSignificant && (c == ')' || c == ']' || c == '}')) {
++                    startsWithCloser = true
++                }
++                firstSignificant = false
++                when (c) {
++                    '(', '[', '{' -> lineDelta++
++                    ')', ']', '}' -> lineDelta--
++                }
++                i++
++            }
++            val indentDepth = (depth - if (startsWithCloser) 1 else 0).coerceAtLeast(0)
++            out.add("    ".repeat(indentDepth) + trimmed)
++            depth = (depth + lineDelta).coerceAtLeast(0)
++        }
++        return out.joinToString("\n").trimEnd('\n') + "\n"
++    }
++
+     private fun showSaveAsDialog() {
+         val input = EditText(this).apply {
+             hint = "filename.txt"
+@@ -5483,6 +5676,48 @@ R.id.action_markdown_preview -> {
+         }
+     }
+ 
++    // v6 (11): list of functions/classes in the active file, tap to jump.
++    // Two patterns: keyword definitions (fun/def/class/...) and C-style
++    // "name(args) {" definitions; control words (if/for/while/...) are
++    // filtered out of the C-style matches.
++    private fun showCodeOutline() {
++        val fullText = binding.editor.text?.toString() ?: return
++        val lines = fullText.split('\n')
++        val keywordPattern = Regex("""^\s*(fun|def|function|class|interface|object|enum|trait|struct)\s+([A-Za-z_]\w*)""")
++        val cStylePattern = Regex("""^\s*(?:[\w<>\[\],\s]+?\s+)?([A-Za-z_]\w*)\s*\([^;{}]*\)\s*\{\s*$""")
++        val controlWords = setOf("if", "for", "while", "switch", "catch", "return", "sizeof")
++        val items = ArrayList<String>()
++        val offsets = ArrayList<Int>()
++        var offset = 0
++        for ((index, line) in lines.withIndex()) {
++            val m1 = keywordPattern.find(line)
++            val name = when {
++                m1 != null -> m1.groupValues[2]
++                else -> {
++                    val n = cStylePattern.find(line)?.groupValues?.get(1)
++                    if (n != null && n !in controlWords) n else null
++                }
++            }
++            if (name != null) {
++                items.add("$name  ·  line ${index + 1}")
++                offsets.add(offset)
++            }
++            offset += line.length + 1
++        }
++        if (items.isEmpty()) {
++            Toast.makeText(this, "No functions found", Toast.LENGTH_SHORT).show()
++            return
++        }
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Code Outline")
++            .setItems(items.toTypedArray()) { _, which ->
++                binding.editor.requestFocus()
++                binding.editor.setSelection(offsets[which].coerceIn(0, fullText.length))
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
+     private fun showGotoLineDialog() {
+         val gBinding = DialogGotoBinding.inflate(layoutInflater)
+         gBinding.gotoWrap.hint = "Line (1-${totalLines()})"
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+index 69de226..650e8cc 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+@@ -103,6 +103,7 @@ class SettingsActivity : AppCompatActivity() {
+         binding.switchSymbolsBar.isChecked = prefs.symbolsBar
+         binding.switchHideHiddenFiles.isChecked = prefs.hideHiddenFiles
+         binding.switchInsertFinalNewline.isChecked = prefs.insertFinalNewline
++        binding.switchFormatOnSave.isChecked = prefs.formatOnSave
+         binding.switchShowWhitespace.isChecked = prefs.showWhitespace
+         binding.switchRainbowBrackets.isChecked = prefs.rainbowBrackets
+         binding.switchSyntaxHighlight.isChecked = prefs.syntaxHighlight
+@@ -222,6 +223,10 @@ class SettingsActivity : AppCompatActivity() {
+             prefs.insertFinalNewline = isChecked
+         }
+ 
++        binding.switchFormatOnSave.setOnCheckedChangeListener { _, isChecked ->
++            prefs.formatOnSave = isChecked
++        }
++
+         binding.rowLineSpacing.setOnClickListener {
+             val options = arrayOf("100% (Compact)", "115% (Normal)", "130% (Relaxed)", "150% (Loose)")
+             val values = floatArrayOf(1.0f, 1.15f, 1.3f, 1.5f)
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+index a9be9b5..88f015e 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+@@ -10,17 +10,24 @@ import android.os.Looper
+ import android.text.Editable
+ import android.text.InputType
+ import android.text.Spannable
++import android.text.TextPaint
+ import android.text.TextWatcher
++import android.text.style.CharacterStyle
+ import android.text.style.ForegroundColorSpan
+ import android.util.AttributeSet
++import android.graphics.drawable.ColorDrawable
+ import android.view.Gravity
+ import android.view.KeyEvent
+ import android.view.MotionEvent
+ import android.view.ScaleGestureDetector
++import android.view.View
+ import android.view.inputmethod.EditorInfo
+ import android.view.inputmethod.InputConnection
+ import android.view.inputmethod.InputConnectionWrapper
+ import android.view.inputmethod.InputMethodManager
++import android.widget.ArrayAdapter
++import android.widget.ListView
++import android.widget.PopupWindow
+ import android.widget.Toast
+ import androidx.appcompat.widget.AppCompatEditText
+ import com.nobidev.nobicode.R
+@@ -103,6 +110,28 @@ class CodeEditorView @JvmOverloads constructor(
+     private var wrapSelText: String? = null
+     private var isHighlighting = false
+     private var isSmartTyping = false
++
++    // ===== v6 code suggestions (19) =====
++    // Popup anchored under the caret; non-focusable so typing keeps going
++    // into the editor. isSuggestionInsert only suppresses the popup refresh
++    // (NOT undo capture) so accepting a suggestion stays one Undo step.
++    private var suggestionPopup: PopupWindow? = null
++    private var isSuggestionInsert = false
++    private var suggestionDismissGuard = false
++
++    // ===== v6 error underline (20) =====
++    // Custom CharacterStyle (NOT ForegroundColorSpan): SyntaxHighlighter
++    // har pass me saare ForegroundColorSpan wipe karta hai, isliye error
++    // span us type ka hota to har highlight par gayab ho jata. Ye span
++    // sirf underline lagata hai, rang highlighter ka hi rehta hai.
++    class BracketErrorSpan(val reason: String) : CharacterStyle() {
++        override fun updateDrawState(tp: TextPaint) {
++            tp.isUnderlineText = true
++        }
++    }
++
++    private data class BracketError(val offset: Int, val reason: String)
++    private var bracketScanRunnable: Runnable? = null
+     private var largeFileMode: Boolean = false
+     private var smartTypingEditEnd: Int = -1
+     private var smartTypingNetZero: Boolean = false
+@@ -321,6 +350,13 @@ class CodeEditorView @JvmOverloads constructor(
+                 }
+                 updateGutterWidth()
+                 scheduleHighlight()
++                // v6 (19): refresh the suggestion popup on real typing only.
++                if (!isUndoOrRedo && !isProgrammaticChange && !isFoldingOp && !isSmartTyping && !isMultiCursorEdit && !isSuggestionInsert) {
++                    updateSuggestions()
++                }
++                // v6 (20): bracket scan har text change par (file load bhi);
++                // runnable khud highlight pass ke dauran defer ho jata hai.
++                scheduleBracketScan()
+                 // Fold collapse/expand se text badalta hai lekin code nahi badla -
+                 // isliye dirty/save trigger mat karo (Sam: fold par save button na aaye)
+                 if (!isFoldingOp) {
+@@ -872,6 +908,26 @@ class CodeEditorView @JvmOverloads constructor(
+                 return true
+             }
+         }
++        // v6 (20): underlined bracket error par tap = reason Toast.
++        if (event.actionMasked == MotionEvent.ACTION_UP && !boxDragging) {
++            val tapLayout = layout
++            val ed = text
++            if (tapLayout != null && ed != null) {
++                val tapLine = ((event.y + scrollY) / lineHeight).toInt()
++                    .coerceIn(0, (lineCount - 1).coerceAtLeast(0))
++                val tapOff = tapLayout.getOffsetForHorizontal(tapLine, event.x + scrollX - paddingLeft)
++                    .coerceIn(tapLayout.getLineStart(tapLine), tapLayout.getLineEnd(tapLine))
++                val spans = ed.getSpans(tapOff, tapOff, BracketErrorSpan::class.java)
++                val hit = spans.firstOrNull { span ->
++                    val s = ed.getSpanStart(span)
++                    val e = ed.getSpanEnd(span)
++                    tapOff in s until e
++                }
++                if (hit != null) {
++                    Toast.makeText(context, hit.reason, Toast.LENGTH_SHORT).show()
++                }
++            }
++        }
+         if (pinchZoomEnabled) scaleDetector.onTouchEvent(event)
+         return super.onTouchEvent(event)
+     }
+@@ -1494,6 +1550,22 @@ class CodeEditorView @JvmOverloads constructor(
+         if (typewriterMode && selStart == selEnd && line != lastTypewriterLine) {
+             recenterCaret()
+         }
++        // v6 (19): tap / caret move = popup band. Lekin typing ke baad
++        // selection change afterTextChanged KE BAAD aata hai, isliye
++        // updateSuggestions ek one-shot guard set karta hai jo sirf us
++        // turant wale selection change ko dismiss se bachata hai.
++        // Suggestion insert apna selection khud set karta hai, isliye
++        // us dauran bhi dismiss mat karo.
++        if (suggestionDismissGuard) {
++            suggestionDismissGuard = false
++        } else if (!isSuggestionInsert) {
++            dismissSuggestions()
++        }
++    }
++
++    override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
++        super.onFocusChanged(focused, direction, previouslyFocusedRect)
++        if (!focused) dismissSuggestions()
+     }
+ 
+     override fun onScrollChanged(horiz: Int, vert: Int, oldHoriz: Int, oldVert: Int) {
+@@ -4165,4 +4237,233 @@ class CodeEditorView @JvmOverloads constructor(
+         ed.replace(rangeStart, rangeEnd, newText)
+         setSelection(rangeStart, (rangeStart + newText.length).coerceAtMost(ed.length))
+     }
++
++    // ===== v6 code suggestions (19) =====
++    // Current word (caret ke peeche, 2+ chars) ke liye language keywords +
++    // types + isi file ke identifiers se popup. Tap = word replace.
++
++    private fun isSuggestionWordChar(c: Char): Boolean =
++        c.isLetterOrDigit() || c == '_' || c == '$'
++
++    /** Caret ke peeche wala word, ya null (selection / chhota word). */
++    private fun currentWordRange(): Pair<Int, Int>? {
++        val ed = text ?: return null
++        val caret = selectionStart
++        if (caret != selectionEnd || caret == 0) return null
++        var start = caret
++        while (start > 0 && isSuggestionWordChar(ed[start - 1])) start--
++        if (caret - start < 2) return null
++        return start to caret
++    }
++
++    private fun updateSuggestions() {
++        // Typing ke baad aane wale selection change se popup na mare.
++        suggestionDismissGuard = true
++        val range = currentWordRange()
++        if (range == null) {
++            dismissSuggestions()
++            return
++        }
++        val ed = text ?: return
++        val prefix = ed.substring(range.first, range.second)
++        val lang = Languages.byExt(currentFileExtension)
++        val seen = LinkedHashSet<String>()
++        val candidates = ArrayList<String>()
++        fun offer(word: String) {
++            if (candidates.size >= 12) return
++            if (word.length < prefix.length) return
++            if (!word.startsWith(prefix, ignoreCase = true)) return
++            if (word.equals(prefix, ignoreCase = true)) return
++            if (seen.add(word)) candidates.add(word)
++        }
++        for (kw in lang.keywords) offer(kw)
++        for (t in lang.types) offer(t)
++        // Document identifiers (badi file me scan cap: sirf keywords).
++        if (ed.length <= 200_000) {
++            var scanned = 0
++            val idRegex = Regex("[A-Za-z_][A-Za-z0-9_]*")
++            for (m in idRegex.findAll(ed)) {
++                if (scanned++ > 2000 || candidates.size >= 12) break
++                offer(m.value)
++            }
++        }
++        if (candidates.isEmpty()) {
++            dismissSuggestions()
++            return
++        }
++        showSuggestionPopup(candidates)
++    }
++
++    private fun showSuggestionPopup(candidates: List<String>) {
++        val lay = layout ?: return
++        val caret = selectionStart
++        if (caret > length()) return
++        val density = resources.displayMetrics.density
++        val popupWidth = (280 * density).toInt()
++        val rowH = (48 * density).toInt()
++        val popupHeight = (candidates.size * rowH).coerceAtMost((240 * density).toInt())
++        val listView = ListView(context)
++        listView.adapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, candidates)
++        listView.setOnItemClickListener { _, _, pos, _ ->
++            acceptSuggestion(candidates[pos])
++        }
++        val popup = PopupWindow(listView, popupWidth, popupHeight, false)
++        popup.setBackgroundDrawable(ColorDrawable(Color.parseColor("#23233A")))
++        popup.elevation = 8f
++        suggestionPopup?.dismiss()
++        suggestionPopup = popup
++        val line = lay.getLineForOffset(caret.coerceIn(0, length()))
++        val caretX = (lay.getPrimaryHorizontal(caret) + paddingLeft - scrollX).toInt()
++        val caretY = lay.getLineBottom(line) - scrollY + paddingTop
++        val x = caretX.coerceIn(0, (width - popupWidth).coerceAtLeast(0))
++        popup.showAsDropDown(this, x, caretY - height)
++    }
++
++    private fun acceptSuggestion(candidate: String) {
++        val range = currentWordRange() ?: run {
++            dismissSuggestions()
++            return
++        }
++        val ed = text ?: return
++        isSuggestionInsert = true
++        try {
++            ed.replace(range.first, range.second, candidate)
++            setSelection((range.first + candidate.length).coerceAtMost(ed.length))
++        } finally {
++            isSuggestionInsert = false
++        }
++        dismissSuggestions()
++    }
++
++    private fun dismissSuggestions() {
++        suggestionPopup?.dismiss()
++        suggestionPopup = null
++    }
++
++    // ===== v6 error underline (20): bracket scanner =====
++    // Conservative scanner: strings, char literals, line comments aur
++    // C-style block comments ke andar wale brackets ignore hote hain.
++    // Kotlin raw strings (""") handle nahi hote — unke andar ka bracket
++    // galat flag ho sakta hai (known limitation, STATUS me darj).
++
++    private fun scheduleBracketScan() {
++        bracketScanRunnable?.let { uiHandler.removeCallbacks(it) }
++        val r = Runnable {
++            if (isHighlighting) {
++                // Highlight pass khatam hone ke baad dobara try karo.
++                uiHandler.postDelayed(bracketScanRunnable!!, 300)
++                return@Runnable
++            }
++            applyBracketErrors()
++        }
++        bracketScanRunnable = r
++        uiHandler.postDelayed(r, 500)
++    }
++
++    private fun applyBracketErrors() {
++        val ed = text ?: return
++        for (span in ed.getSpans(0, ed.length, BracketErrorSpan::class.java)) {
++            ed.removeSpan(span)
++        }
++        val lang = Languages.byExt(currentFileExtension)
++        for (err in scanBracketErrors(ed.toString(), lang)) {
++            if (err.offset in 0 until ed.length) {
++                ed.setSpan(BracketErrorSpan(err.reason), err.offset, err.offset + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
++            }
++        }
++    }
++
++    private fun scanBracketErrors(src: String, lang: Language): List<BracketError> {
++        val errors = ArrayList<BracketError>()
++        val stack = ArrayDeque<Pair<Char, Int>>()
++        val lineComment = lang.lineComment
++        val cLikeBlock = lineComment == "//"
++        var i = 0
++        var state = 0 // 0 normal, 1 line comment, 2 block comment, 3 string, 4 char
++        var stringDelim = '"'
++        while (i < src.length) {
++            val c = src[i]
++            when (state) {
++                1 -> {
++                    if (c == '\n') state = 0
++                    i++
++                    continue
++                }
++                2 -> {
++                    if (c == '*' && i + 1 < src.length && src[i + 1] == '/') {
++                        state = 0
++                        i += 2
++                    } else {
++                        i++
++                    }
++                    continue
++                }
++                3 -> {
++                    if (c == '\\' && i + 1 < src.length) {
++                        i += 2
++                        continue
++                    }
++                    if (c == stringDelim) state = 0
++                    i++
++                    continue
++                }
++                4 -> {
++                    if (c == '\\' && i + 1 < src.length) {
++                        i += 2
++                        continue
++                    }
++                    if (c == '\'') state = 0
++                    i++
++                    continue
++                }
++            }
++            if (lineComment != null && src.startsWith(lineComment, i)) {
++                state = 1
++                i += lineComment.length
++                continue
++            }
++            if (cLikeBlock && c == '/' && i + 1 < src.length && src[i + 1] == '*') {
++                state = 2
++                i += 2
++                continue
++            }
++            if (c == '"' && '"' in lang.stringDelims) {
++                state = 3
++                stringDelim = '"'
++                i++
++                continue
++            }
++            if (c == '\'' && '\'' in lang.stringDelims) {
++                state = 4
++                i++
++                continue
++            }
++            when (c) {
++                '(', '[', '{' -> stack.addLast(c to i)
++                ')', ']', '}' -> {
++                    val open = when (c) {
++                        ')' -> '('
++                        ']' -> '['
++                        else -> '{'
++                    }
++                    if (stack.isEmpty()) {
++                        errors.add(BracketError(i, "Unmatched '$c' — no opening bracket"))
++                    } else {
++                        val (top, _) = stack.last()
++                        if (top == open) {
++                            stack.removeLast()
++                        } else {
++                            errors.add(BracketError(i, "Mismatched '$c' — the open '$top' needs a different closer"))
++                            stack.removeLast()
++                        }
++                    }
++                }
++            }
++            i++
++        }
++        for ((open, off) in stack) {
++            errors.add(BracketError(off, "Unclosed '$open' — missing its closing bracket"))
++        }
++        return errors
++    }
+ }
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/model/FileItem.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/model/FileItem.kt
+index 1fe4abe..330b7b3 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/model/FileItem.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/model/FileItem.kt
+@@ -6,5 +6,10 @@ data class FileItem(
+     val name: String,
+     val uri: Uri,
+     val isDirectory: Boolean,
+-    val isParent: Boolean = false
++    val isParent: Boolean = false,
++    // v6 tree sidebar: indent level in the flattened drawer list, and whether
++    // this directory is currently expanded inline. Defaults keep every
++    // existing construction site valid.
++    val depth: Int = 0,
++    val isExpanded: Boolean = false
+ )
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
+index 7fea653..b482342 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
+@@ -83,6 +83,11 @@ class EditorPreferences(context: Context) {
+         get() = prefs.getBoolean("trim_trailing_whitespace", true)
+         set(value) = prefs.edit().putBoolean("trim_trailing_whitespace", value).apply()
+ 
++    // v6 (12): format on save (default off — opt-in formatting).
++    var formatOnSave: Boolean
++        get() = prefs.getBoolean("format_on_save", false)
++        set(value) = prefs.edit().putBoolean("format_on_save", value).apply()
++
+     var autoIndentOnPaste: Boolean
+         get() = prefs.getBoolean("auto_indent_on_paste", true)
+         set(value) = prefs.edit().putBoolean("auto_indent_on_paste", value).apply()
+diff --git a/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml b/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
+index f1cd4e2..d53248d 100644
+--- a/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
++++ b/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
+@@ -1310,6 +1310,50 @@
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+ 
++            <!-- v6 (12): format on save toggle. -->
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="72dp"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="20dp"
++                android:paddingEnd="16dp">
++
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_text_size"
++                    app:tint="@color/primary" />
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical"
++                    android:paddingStart="16dp"
++                    android:paddingEnd="16dp">
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Format on save"
++                        android:textSize="16sp"
++                        android:textColor="?attr/colorOnSurface" />
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="Reindent brace code and trim trailing whitespace on save"
++                        android:textSize="14sp"
++                        android:textColor="?attr/colorOnSurfaceVariant" />
++                </LinearLayout>
++
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchFormatOnSave"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++
+             <LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+diff --git a/termux-app/nobicode/src/main/res/menu/main_menu.xml b/termux-app/nobicode/src/main/res/menu/main_menu.xml
+index 3206878..ebaaa17 100644
+--- a/termux-app/nobicode/src/main/res/menu/main_menu.xml
++++ b/termux-app/nobicode/src/main/res/menu/main_menu.xml
+@@ -63,6 +63,12 @@
+         android:title="@string/action_goto"
+         app:showAsAction="never" />
+ 
++    <!-- v6 (11): list of functions in the file, tap to jump. -->
++    <item
++        android:id="@+id/action_outline"
++        android:title="Code Outline"
++        app:showAsAction="never" />
++
+     <item
+         android:id="@+id/action_markdown_preview"
+         android:title="@string/action_markdown_preview"
+diff --git a/termux-app/termux-shared/src/main/res/drawable/ic_error_notification.xml b/termux-app/termux-shared/src/main/res/drawable/ic_error_notification.xml
+index 67f1771..9c746a5 100644
+--- a/termux-app/termux-shared/src/main/res/drawable/ic_error_notification.xml
++++ b/termux-app/termux-shared/src/main/res/drawable/ic_error_notification.xml
+@@ -12,8 +12,10 @@
+         <clip-path
+             android:pathData="M0,0h24v24h-24z"/>
+ 
++        <!-- v6: old Termux chevron replaced by the neon "N" mark (scaled to
++             the left half so the error X on the right keeps its meaning). -->
+         <path
+-            android:pathData="M5,4H2L8,12L2,20H5L11,12L5,4Z"
++            android:pathData="M2,17.33 L2,6.67 L4.22,6.67 L10,13.78 L10,6.67 L12.67,6.67 L12.67,17.33 L10.44,17.33 L4.67,10.22 L4.67,17.33 Z"
+             android:fillColor="#ffffff"/>
+ 
+         <path
