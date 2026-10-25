@@ -260,8 +260,9 @@ move_bootstraps() {
 
 
 # Use a sha256-verified cached bootstrap instead of rebuilding it.
-# Env: TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR (dir with bootstrap-*.zip,
-# xz-* files plus bootstrap-cache-manifest.txt listing "<sha256>  <file>").
+# Env: TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR (dir with bootstrap-*.tar.xz,
+# xz-* dir files plus bootstrap-cache-manifest.txt listing "<sha256>  <file>"
+# for every file, e.g. bootstrap-aarch64.tar.xz and xz-aarch64/xz).
 # Returns 0 ONLY when every manifest entry exists, matches its sha256, and
 # was copied into the app assets dir (same dir move_bootstraps uses).
 # ANY problem (unset/empty dir, missing manifest, missing file, sha
@@ -287,8 +288,8 @@ use_cached_bootstrap() {
         echo "[cache] REJECTED cached bootstrap: manifest empty, building bootstraps."
         return 1
     fi
-    if ! grep -q 'bootstrap-.*\.zip$' "$manifest"; then
-        echo "[cache] REJECTED cached bootstrap: manifest lists no bootstrap zip, building bootstraps."
+    if ! grep -q 'bootstrap-.*\.tar\.xz$' "$manifest"; then
+        echo "[cache] REJECTED cached bootstrap: manifest lists no bootstrap tar.xz, building bootstraps."
         return 1
     fi
     local expected file actual
@@ -314,7 +315,8 @@ use_cached_bootstrap() {
     mkdir -p "$app_assets_dir"
     while read -r expected file; do
         [ -n "$file" ] || continue
-        cp "$cache_dir/$file" "$app_assets_dir"
+        mkdir -p "$app_assets_dir$(dirname "$file")"
+        cp "$cache_dir/$file" "$app_assets_dir$file"
     done < "$manifest"
     echo "[cache] Using cached bootstrap (sha256-verified, $(grep -c . "$manifest") files), skipping build_bootstraps"
     touch "${TERMUX_GENERATOR_HOME:-.}/.bootstrap-cache-hit"

@@ -7,6 +7,9 @@
 #    (w10/w11/...), timestamp, run id — warna har batch cache MISS hoga.
 #  - Bootstrap restore: PRIMARY GitHub Release asset, tag `bootstrap-cache-test`
 #    (repo-global, koi branch scoping nahi). Missing asset = normal MISS.
+#    Real bootstrap files (run1 se proven): bootstrap-aarch64.tar.xz (file)
+#    + xz-aarch64/ dir (xz binary + liblzma.so.5) — NOT .zip, yehi pehle
+#    wali galti thi (save step ne .zip dhoondha aur kuch publish nahi kiya).
 #  - Script flag TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR: sha256-verified
 #    cached bootstrap milne par build_bootstraps SKIP + assets me copy;
 #    na mile / mismatch ho to chupchaap FULL build_bootstraps par giro.
@@ -275,7 +278,8 @@ jobs:
                 $PLUGIN
           echo "--- APK assets bootstrap check (cache proof) ---"
           ls -l termux-apps-main/termux-app/app/src/main/assets/ 2>/dev/null | grep -E 'bootstrap|xz-' || echo "No bootstrap files in assets dir"
-          sha256sum termux-apps-main/termux-app/app/src/main/assets/bootstrap-*.zip termux-apps-main/termux-app/app/src/main/assets/xz-* 2>/dev/null || true
+          sha256sum termux-apps-main/termux-app/app/src/main/assets/bootstrap-*.tar.xz 2>/dev/null || true
+          find termux-apps-main/termux-app/app/src/main/assets/xz-* -type f 2>/dev/null | sort | xargs sha256sum 2>/dev/null || true
 
       # --- Bootstrap cache save (sirf jab bootstrap dobara bana ho) ---
       # Marker file .bootstrap-cache-hit script tabhi banata hai jab cached
@@ -292,16 +296,20 @@ jobs:
             exit 0
           fi
           ASSETS="termux-apps-main/termux-app/app/src/main/assets"
-          if ! ls "$ASSETS"/bootstrap-*.zip "$ASSETS"/xz-* >/dev/null 2>&1; then
-            echo "No bootstrap files in assets dir — nothing to publish."
+          if ! ls "$ASSETS"/bootstrap-*.tar.xz >/dev/null 2>&1; then
+            echo "No bootstrap tar.xz in assets dir — nothing to publish."
+            exit 0
+          fi
+          if ! ls -d "$ASSETS"/xz-* >/dev/null 2>&1; then
+            echo "No xz dir in assets dir — nothing to publish."
             exit 0
           fi
           KEY="${{ steps.bootstrap-key.outputs.cache_key }}"
           ASSET="${KEY}.tar.gz"
           cd "$ASSETS"
-          sha256sum bootstrap-*.zip xz-* > bootstrap-cache-manifest.txt
+          { sha256sum bootstrap-*.tar.xz; find xz-* -type f | sort | xargs sha256sum; } > bootstrap-cache-manifest.txt
           cat bootstrap-cache-manifest.txt
-          tar -czf "/tmp/$ASSET" bootstrap-*.zip xz-* bootstrap-cache-manifest.txt
+          tar -czf "/tmp/$ASSET" bootstrap-*.tar.xz xz-* bootstrap-cache-manifest.txt
           ls -l "/tmp/$ASSET"
           cd "$GITHUB_WORKSPACE"
           gh release create bootstrap-cache-test --target "$GITHUB_SHA" --title "Bootstrap cache (test)" --notes "Cached bootstrap outputs, content-addressed by upstream SHAs. Test tag for cache-test runs." 2>/dev/null || true
