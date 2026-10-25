@@ -1,0 +1,72 @@
+diff --git a/termux-app/app/src/main/res/drawable/nobi_ic_shield.xml b/termux-app/app/src/main/res/drawable/nobi_ic_shield.xml
+--- a/termux-app/app/src/main/res/drawable/nobi_ic_shield.xml
++++ b/termux-app/app/src/main/res/drawable/nobi_ic_shield.xml
+@@ -8,7 +8,7 @@
+         android:fillColor="#8B5CF6"
+         android:pathData="M12,1L3,5v6c0,5.55 3.84,10.74 9,12 5.16,-1.26 9,-6.45 9,-12V5l-9,-4z" />
+     <path
+-        android:fillColor="none"
++        android:fillColor="@android:color/transparent"
+         android:strokeColor="#22D3EE"
+         android:strokeWidth="2"
+         android:pathData="M9,12l2,2 4,-4" />
+diff --git a/termux-app/nobicode/src/main/res/drawable/nobi_img_about_banner.xml b/termux-app/nobicode/src/main/res/drawable/nobi_img_about_banner.xml
+--- a/termux-app/nobicode/src/main/res/drawable/nobi_img_about_banner.xml
++++ b/termux-app/nobicode/src/main/res/drawable/nobi_img_about_banner.xml
+@@ -21,12 +21,12 @@
+         android:fillColor="#22D3EE"
+         android:pathData="M168,28 L192,28 L224,92 L224,28 L248,28 L248,132 L224,132 L192,68 L192,132 L168,132 Z" />
+     <path
+-        android:fillColor="none"
++        android:fillColor="@android:color/transparent"
+         android:strokeColor="#8B5CF6"
+         android:strokeWidth="6"
+         android:pathData="M96,62 L124,80 L96,98" />
+     <path
+-        android:fillColor="none"
++        android:fillColor="@android:color/transparent"
+         android:strokeColor="#22D3EE"
+         android:strokeWidth="6"
+         android:pathData="M320,62 L292,80 L320,98" />
+diff --git a/termux-app/nobicode/src/main/res/drawable/nobi_img_settings_strip.xml b/termux-app/nobicode/src/main/res/drawable/nobi_img_settings_strip.xml
+--- a/termux-app/nobicode/src/main/res/drawable/nobi_img_settings_strip.xml
++++ b/termux-app/nobicode/src/main/res/drawable/nobi_img_settings_strip.xml
+@@ -21,7 +21,7 @@
+         android:fillColor="#22D3EE"
+         android:pathData="M30,22 L46,22 L62,54 L62,22 L78,22 L78,78 L62,78 L46,46 L46,78 L30,78 Z" />
+     <path
+-        android:fillColor="none"
++        android:fillColor="@android:color/transparent"
+         android:strokeColor="#22D3EE"
+         android:strokeWidth="4"
+         android:pathData="M120,34 H240 M120,56 H200 M120,78 H260" />
+diff --git a/termux-app/nobicode/src/main/res/drawable/nobi_img_welcome.xml b/termux-app/nobicode/src/main/res/drawable/nobi_img_welcome.xml
+--- a/termux-app/nobicode/src/main/res/drawable/nobi_img_welcome.xml
++++ b/termux-app/nobicode/src/main/res/drawable/nobi_img_welcome.xml
+@@ -22,12 +22,12 @@
+         android:fillColor="#22D3EE"
+         android:pathData="M168,28 L192,28 L224,92 L224,28 L248,28 L248,132 L224,132 L192,68 L192,132 L168,132 Z" />
+     <path
+-        android:fillColor="none"
++        android:fillColor="@android:color/transparent"
+         android:strokeColor="#22D3EE"
+         android:strokeWidth="6"
+         android:pathData="M96,62 L124,80 L96,98" />
+     <path
+-        android:fillColor="none"
++        android:fillColor="@android:color/transparent"
+         android:strokeColor="#8B5CF6"
+         android:strokeWidth="6"
+         android:pathData="M304,62 L276,80 L304,98" />
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+@@ -3129,7 +3129,7 @@
+                         for (i in 0 until checkLen) {
+                             if (bytes[i] == 0.toByte()) { bin = true; break }
+                         }
+-                        String(bytes, FollowupEncoding.charsetFor(FollowupStore.encodingFor(this, docFile.uri.toString()))) to bin
++                        String(bytes, FollowupEncoding.charsetFor(FollowupStore.encodingFor(this@MainActivity, docFile.uri.toString()))) to bin
+                     } ?: ("" to false)
+                 } catch (e: Exception) {
+                     "" to false
