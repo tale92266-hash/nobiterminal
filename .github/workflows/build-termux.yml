@@ -120,6 +120,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    # gh CLI ko Actions me GH_TOKEN chahiye hota hai (warna exit 4:
+    # "set the GH_TOKEN environment variable"). Ye token workflow ka
+    # apna github.token hai (permissions: contents: write upar hai) —
+    # isse gh release download (restore) aur gh release create/upload
+    # (save) dono chalte hain. Bina iske download chupchaap MISS dikhta
+    # hai aur upload step fail karta hai (run1b me yahi hua tha).
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
