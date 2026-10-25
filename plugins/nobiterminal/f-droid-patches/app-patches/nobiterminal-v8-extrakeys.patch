@@ -1,0 +1,2348 @@
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+index 93b4aea..43aec8a 100644
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -15,7 +15,7 @@
+     <permission
+         android:name="${TERMUX_PACKAGE_NAME}.permission.RUN_COMMAND"
+         android:description="@string/permission_run_command_description"
+-        android:icon="@mipmap/ic_launcher"
++        android:icon="@drawable/nobi_app_icon"
+         android:label="@string/permission_run_command_label"
+         android:protectionLevel="dangerous" />
+ 
+@@ -37,14 +37,16 @@
+     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+ 
++    <!-- v8 (icon audit): the banner attribute was removed — it only
++         feeds the TV leanback launcher and pointed at the old "Termux"
++         text PNG, which no UI path now references. -->
+     <application
+         android:name=".app.TermuxApplication"
+         android:allowBackup="false"
+-        android:banner="@drawable/banner"
+-        android:icon="@mipmap/ic_launcher"
++        android:icon="@drawable/nobi_app_icon"
+         android:label="@string/application_name"
+         android:requestLegacyExternalStorage="true"
+-        android:roundIcon="@mipmap/ic_launcher_round"
++        android:roundIcon="@drawable/nobi_app_icon_round"
+         android:supportsRtl="false"
+         android:theme="@style/Theme.TermuxApp.DayNight.DarkActionBar"
+         tools:targetApi="m">
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+index 5edabf9..b327a80 100644
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -2001,7 +2001,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+             overlay.setFocusable(false);
+             int iconSize = (int) (132 * getResources().getDisplayMetrics().density);
+             android.widget.ImageView icon = new android.widget.ImageView(this);
+-            icon.setImageResource(R.mipmap.ic_launcher);
++            icon.setImageResource(R.drawable.nobi_app_icon);
+             android.widget.FrameLayout.LayoutParams iconParams =
+                 new android.widget.FrameLayout.LayoutParams(iconSize, iconSize,
+                     android.view.Gravity.CENTER);
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
+index 8dab139..8b4647a 100644
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiTerminalUtils.java
+@@ -22,8 +22,11 @@ import java.io.InputStreamReader;
+ import java.io.OutputStreamWriter;
+ import java.nio.charset.StandardCharsets;
+ import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.HashSet;
+ import java.util.LinkedHashSet;
+ import java.util.List;
++import java.util.Locale;
+ import java.util.Set;
+ import java.util.regex.Matcher;
+ import java.util.regex.Pattern;
+@@ -232,6 +235,154 @@ public final class NobiTerminalUtils {
+         "ESC", "DRAWER", "TAB", "CTRL", "ALT", "|", "-", "/", "_",
+         "HOME", "END", "PGUP", "PGDN", "LEFT", "DOWN", "UP", "RIGHT"};
+ 
++    /**
++     * v8 (extra-keys cleanup): keys Sam asked to remove from the bar.
++     * They are in NEITHER the built-in default value NOR the Nobi Extra
++     * Keys settings toggles/presets, so they can only reach the bar
++     * through a hand-edited extra-keys line in ~/.termux/termux.properties,
++     * which overrides the code default at load time. Matching is exact
++     * (after trim) and case-insensitive, so 'keyboard' or 'New Session'
++     * spellings are caught too.
++     */
++    public static final Set<String> REMOVED_EXTRA_KEYS = new HashSet<>(Arrays.asList(
++        "KEYBOARD", "NEW SESSION", "NEW WINDOW"));
++
++    /** True if the given extra-key name is one of the removed keys. */
++    public static boolean isRemovedExtraKey(@Nullable String key) {
++        if (key == null) return false;
++        return REMOVED_EXTRA_KEYS.contains(key.trim().toUpperCase(Locale.ROOT));
++    }
++
++    private static final Pattern EXTRA_KEY_OBJECT_KEY_PATTERN =
++        Pattern.compile("(?:key|macro)\\s*:\\s*'([^']+)'");
++    private static final Pattern EXTRA_KEY_OBJECT_POPUP_PATTERN =
++        Pattern.compile("popup\\s*:\\s*'([^']+)'");
++
++    /**
++     * Strip the removed keys from an extra-keys property value, keeping
++     * every other key, its popup object and the row order untouched.
++     * A plain removed key ('KEYBOARD') and a whole popup object whose
++     * key/macro is removed ({key: 'NEW SESSION', ...}) are dropped; a
++     * popup that IS a removed key ({key: '-', popup: 'KEYBOARD'}) loses
++     * only the popup clause. Rows left empty are dropped. Returns null
++     * for null input and "[]" if nothing is left. A value that does not
++     * parse as a matrix of rows is returned unchanged, so the caller
++     * falls back to the built-in default exactly as before instead of
++     * silently mangling a hand-edited line.
++     */
++    @Nullable
++    public static String sanitizeExtraKeysValue(@Nullable String value) {
++        if (value == null) return null;
++        String input = value.trim();
++        if (input.length() < 2 || input.charAt(0) != '[') return value;
++
++        List<String> rows = new ArrayList<>();
++        int i = 1; // past the outer '['
++        int n = input.length();
++        boolean outerClosed = false;
++        while (i < n) {
++            char c = input.charAt(i);
++            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',') { i++; continue; }
++            if (c == ']') { outerClosed = true; break; }
++            if (c != '[') return value; // malformed: leave untouched
++            i++; // past the row '['
++            List<String> elements = new ArrayList<>();
++            boolean rowClosed = false;
++            while (i < n) {
++                char rc = input.charAt(i);
++                if (rc == ' ' || rc == '\t' || rc == '\n' || rc == '\r' || rc == ',') { i++; continue; }
++                if (rc == ']') { rowClosed = true; i++; break; }
++                if (rc == '\'' || rc == '"') {
++                    int end = findExtraKeysQuotedEnd(input, i);
++                    if (end < 0) return value;
++                    String key = input.substring(i + 1, end);
++                    if (!isRemovedExtraKey(key))
++                        elements.add(input.substring(i, end + 1));
++                    i = end + 1;
++                } else if (rc == '{') {
++                    int end = findExtraKeysObjectEnd(input, i);
++                    if (end < 0) return value;
++                    String cleaned = sanitizeExtraKeyObject(input.substring(i, end + 1));
++                    if (cleaned != null)
++                        elements.add(cleaned);
++                    i = end + 1;
++                } else {
++                    return value; // bare/unquoted token: leave untouched
++                }
++            }
++            if (!rowClosed) return value; // unclosed row: leave untouched
++            if (!elements.isEmpty()) {
++                StringBuilder row = new StringBuilder("[");
++                for (int k = 0; k < elements.size(); k++) {
++                    if (k > 0) row.append(", ");
++                    row.append(elements.get(k));
++                }
++                rows.add(row.append("]").toString());
++            }
++        }
++
++        if (!outerClosed) return value; // unclosed matrix: leave untouched
++        if (rows.isEmpty()) return "[]";
++        StringBuilder out = new StringBuilder("[");
++        for (int k = 0; k < rows.size(); k++) {
++            if (k > 0) out.append(", ");
++            out.append(rows.get(k));
++        }
++        return out.append("]").toString();
++    }
++
++    /** Index of the closing quote at/after {@code start}, or -1. */
++    private static int findExtraKeysQuotedEnd(String input, int start) {
++        char quote = input.charAt(start);
++        for (int i = start + 1; i < input.length(); i++) {
++            if (input.charAt(i) == '\\') { i++; continue; }
++            if (input.charAt(i) == quote) return i;
++        }
++        return -1;
++    }
++
++    /** Index of the '}' matching the '{' at {@code start}, or -1. Quote-aware. */
++    private static int findExtraKeysObjectEnd(String input, int start) {
++        int depth = 0;
++        char quote = 0;
++        for (int i = start; i < input.length(); i++) {
++            char c = input.charAt(i);
++            if (quote != 0) {
++                if (c == '\\') { i++; continue; }
++                if (c == quote) quote = 0;
++                continue;
++            }
++            if (c == '\'' || c == '"') { quote = c; continue; }
++            if (c == '{') depth++;
++            else if (c == '}') {
++                depth--;
++                if (depth == 0) return i;
++            }
++        }
++        return -1;
++    }
++
++    /**
++     * Clean one popup-object element: null if its key/macro is a removed
++     * key (drop the whole button), the object minus its popup clause if
++     * only the popup is a removed key, otherwise the object unchanged.
++     */
++    @Nullable
++    private static String sanitizeExtraKeyObject(String object) {
++        Matcher keyMatcher = EXTRA_KEY_OBJECT_KEY_PATTERN.matcher(object);
++        if (keyMatcher.find() && isRemovedExtraKey(keyMatcher.group(1)))
++            return null;
++        Matcher popupMatcher = EXTRA_KEY_OBJECT_POPUP_PATTERN.matcher(object);
++        if (popupMatcher.find() && isRemovedExtraKey(popupMatcher.group(1))) {
++            // Drop the popup clause, keeping whichever comma form it used.
++            String withoutPopup = object.replaceFirst(",\\s*popup\\s*:\\s*'[^']+'", "");
++            if (withoutPopup.equals(object))
++                withoutPopup = object.replaceFirst("popup\\s*:\\s*'[^']+'\\s*,\\s*", "");
++            return withoutPopup;
++        }
++        return object;
++    }
++
+     private static final Pattern EXTRA_KEYS_LINE_PATTERN = Pattern.compile("^\\s*extra-keys\\s*=(.*)$");
+     private static final Pattern EXTRA_KEY_OBJECT_PATTERN = Pattern.compile("\\{\\s*key\\s*:\\s*'([^']+)'(?:\\s*,\\s*popup\\s*:\\s*'([^']+)')?[^}]*\\}");
+     private static final Pattern EXTRA_KEY_QUOTED_PATTERN = Pattern.compile("'([^']+)'");
+@@ -272,9 +423,15 @@ public final class NobiTerminalUtils {
+     @NonNull
+     public static Set<String> getCurrentExtraKeys() {
+         String value = readExtraKeysPropertyValue();
++        Set<String> keys;
+         if (value == null)
+-            return parseExtraKeysValue(TermuxPropertyConstants.DEFAULT_IVALUE_EXTRA_KEYS);
+-        return parseExtraKeysValue(value);
++            keys = parseExtraKeysValue(TermuxPropertyConstants.DEFAULT_IVALUE_EXTRA_KEYS);
++        else
++            keys = parseExtraKeysValue(value);
++        // v8: never surface the removed keys to the settings screen, so
++        // a toggle/reorder save cannot write them back into the file.
++        keys.removeIf(NobiTerminalUtils::isRemovedExtraKey);
++        return keys;
+     }
+ 
+     /**
+@@ -291,6 +448,7 @@ public final class NobiTerminalUtils {
+         java.util.Set<String> seen = new java.util.HashSet<>();
+         for (String key : orderedKeys) {
+             if (key == null || !seen.add(key)) continue;
++            if (isRemovedExtraKey(key)) continue; // v8: never re-compose a removed key
+             if (row2Set.contains(key)) row2Keys.add(key);
+             else row1Keys.add(key);
+         }
+@@ -352,6 +510,10 @@ public final class NobiTerminalUtils {
+      * (read-modify-write). Returns false on an I/O error.
+      */
+     public static boolean setExtraKeysValue(@Nullable String extraKeysValue) {
++        // v8: any save through the settings screen also cleans the file
++        // itself, so the removed keys do not linger for a later load.
++        if (extraKeysValue != null)
++            extraKeysValue = sanitizeExtraKeysValue(extraKeysValue);
+         File propertiesFile = new File(TermuxConstants.TERMUX_PROPERTIES_PRIMARY_FILE_PATH);
+ 
+         List<String> lines = new ArrayList<>();
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+index 503307b..99fbb60 100644
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+@@ -290,12 +290,15 @@ public class NobiTabsController {
+         } else {
+             tab.setBackgroundColor(isActive ? COLOR_TAB_ACTIVE_BG : COLOR_TAB_INACTIVE_BG);
+         }
+-        tab.setPadding(dp(10), verticalPad, dp(4), verticalPad);
++        // v8 sizing: wider tabs (width only — height/verticalPad untouched)
++        // so short tabs stop crowding each other and mis-taps drop.
++        tab.setPadding(dp(16), verticalPad, dp(8), verticalPad);
+ 
+         LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(
+             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT);
+-        tabParams.setMargins(0, dp(4), dp(4), dp(4));
++        tabParams.setMargins(0, dp(4), dp(8), dp(4));
+         tab.setLayoutParams(tabParams);
++        tab.setMinimumWidth(dp(88));
+ 
+         // v6 (10): per-tab colour dot, shown before the title when set.
+         Integer tabColor = loadTabColors(mActivity).get(session.mHandle);
+@@ -335,7 +338,7 @@ public class NobiTabsController {
+         closeView.setGravity(Gravity.CENTER);
+         closeView.setTextColor(activeText);
+         closeView.setContentDescription("Close session");
+-        closeView.setPadding(dp(6), 0, dp(6), 0);
++        closeView.setPadding(dp(8), 0, dp(8), 0);
+         closeView.setOnClickListener(v -> closeSession(session));
+         tab.addView(closeView);
+ 
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java b/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java
+index a38e8cb..71d723f 100644
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java
+@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
+ import androidx.drawerlayout.widget.DrawerLayout;
+ 
+ import com.termux.app.TermuxActivity;
++import com.termux.app.nobi.NobiTerminalUtils;
+ import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
+ import com.termux.app.terminal.TermuxTerminalViewClient;
+ import com.termux.shared.logger.Logger;
+@@ -54,6 +55,21 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
+             // Check {@link #getExtraKeysInternalPropertyValueFromValue(String)} and
+             // {@link #getExtraKeysStyleInternalPropertyValueFromValue(String)}
+             String extrakeys = (String) mActivity.getProperties().getInternalPropertyValue(TermuxPropertyConstants.KEY_EXTRA_KEYS, true);
++            // v8 (extra-keys cleanup): the property value comes verbatim
++            // from ~/.termux/termux.properties and may still contain the
++            // keys Sam asked to remove (KEYBOARD, NEW SESSION, NEW WINDOW)
++            // even though neither the code default nor the Nobi settings
++            // screen ever offers them. Strip them at load time, so the
++            // bar can never show them again no matter what the old file
++            // contains or what a later hand-edit adds. Every other key
++            // and its order are preserved untouched. The KEYBOARD click
++            // branch below is intentionally left in place: it simply
++            // never fires from the bar now, and the footer keyboard
++            // toggle button still reaches the same handler.
++            if (extrakeys != null)
++                extrakeys = NobiTerminalUtils.sanitizeExtraKeysValue(extrakeys);
++            if (extrakeys == null)
++                extrakeys = TermuxPropertyConstants.DEFAULT_IVALUE_EXTRA_KEYS;
+             String extraKeysStyle = (String) mActivity.getProperties().getInternalPropertyValue(TermuxPropertyConstants.KEY_EXTRA_KEYS_STYLE, true);
+ 
+             ExtraKeysConstants.ExtraKeyDisplayMap extraKeyDisplayMap = ExtraKeysInfo.getCharDisplayMapForStyle(extraKeysStyle);
+diff --git a/termux-app/app/src/main/java/com/termux/filepicker/TermuxDocumentsProvider.java b/termux-app/app/src/main/java/com/termux/filepicker/TermuxDocumentsProvider.java
+index 7974d6d..a68f20c 100644
+--- a/termux-app/app/src/main/java/com/termux/filepicker/TermuxDocumentsProvider.java
++++ b/termux-app/app/src/main/java/com/termux/filepicker/TermuxDocumentsProvider.java
+@@ -75,7 +75,7 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
+         row.add(Root.COLUMN_TITLE, applicationName);
+         row.add(Root.COLUMN_MIME_TYPES, ALL_MIME_TYPES);
+         row.add(Root.COLUMN_AVAILABLE_BYTES, BASE_DIR.getFreeSpace());
+-        row.add(Root.COLUMN_ICON, R.mipmap.ic_launcher);
++        row.add(Root.COLUMN_ICON, R.drawable.nobi_app_icon);
+         return result;
+     }
+ 
+@@ -262,7 +262,7 @@ public class TermuxDocumentsProvider extends DocumentsProvider {
+         row.add(Document.COLUMN_MIME_TYPE, mimeType);
+         row.add(Document.COLUMN_LAST_MODIFIED, file.lastModified());
+         row.add(Document.COLUMN_FLAGS, flags);
+-        row.add(Document.COLUMN_ICON, R.mipmap.ic_launcher);
++        row.add(Document.COLUMN_ICON, R.drawable.nobi_app_icon);
+     }
+ 
+ }
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml b/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml
+index 38ea413..53a4f31 100644
+--- a/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_terminal.xml
+@@ -4,24 +4,15 @@
+     android:viewportWidth="108"
+     android:viewportHeight="108">
+ 
+-    <path
+-        android:fillColor="#FFFFFF"
+-        android:pathData="M34,38
+-                          h6
+-                          l12,16
+-                          l-12,16
+-                          h-6
+-                          l12,-16
+-                          "
+-        />
++    <!-- v8 (icon audit): was the old Termux white ">_" chevron mark.
++         Now the neon "N" letterform as a white silhouette, so drawer
++         rows (tinted via termuxActivityDrawerImageTint), the Nobi Code
++         launcher shortcut and pinned command shortcuts all show the N
++         mark instead of the old chevron. Same N path as ic_foreground /
++         ic_service_notification, scaled to this 108 viewport. -->
+ 
+     <path
+         android:fillColor="#FFFFFF"
+-        android:pathData="M56,66
+-                          h18
+-                          v4
+-                          h-18
+-                          "
+-        />
++        android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
+ 
+ </vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_app_icon.xml b/termux-app/app/src/main/res/drawable/nobi_app_icon.xml
+new file mode 100644
+index 0000000..041bab3
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_app_icon.xml
+@@ -0,0 +1,34 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="108dp"
++    android:height="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++
++    <!-- v8 (icon audit): app icon as a DRAWABLE, not a mipmap reference.
++         The legacy Termux PNGs in the density mipmap folders cannot be
++         deleted by a text patch (GNU patch refuses binary hunks, which is
++         why they survived v6), and on density-qualified lookup they
++         shadow the anydpi vector — that is why Funtouch showed the old
++         black >_ square in the notification shade. A drawable has no
++         density-mipmap rival, so this navy + neon "N" vector (same art
++         as the mipmap-anydpi fallback) is what every icon path now
++         resolves to. The density PNGs remain in the APK as dead files
++         that no UI path references. -->
++
++    <path
++        android:fillColor="#070B1F"
++        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
++
++    <group
++        android:translateX="3"
++        android:translateY="3">
++        <path
++            android:fillColor="#8B5CF6"
++            android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++    </group>
++
++    <path
++        android:fillColor="#22D3EE"
++        android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_app_icon_round.xml b/termux-app/app/src/main/res/drawable/nobi_app_icon_round.xml
+new file mode 100644
+index 0000000..c7fd130
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_app_icon_round.xml
+@@ -0,0 +1,34 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="108dp"
++    android:height="108dp"
++    android:viewportWidth="108"
++    android:viewportHeight="108">
++
++    <!-- v8 (icon audit): round app icon, drawable twin of
++         nobi_app_icon.xml (circle-clipped navy background + neon "N").
++         Same reason as nobi_app_icon.xml: avoids the legacy density
++         mipmap PNGs that a text patch cannot delete. -->
++
++    <group>
++        <clip-path
++            android:pathData="M54,54 m-54,0 a54,54 0 1,0 108,0 a54,54 0 1,0 -108,0" />
++
++        <path
++            android:fillColor="#070B1F"
++            android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
++
++        <group
++            android:translateX="3"
++            android:translateY="3">
++            <path
++                android:fillColor="#8B5CF6"
++                android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++        </group>
++
++        <path
++            android:fillColor="#22D3EE"
++            android:pathData="M30,78 L30,30 L40,30 L66,62 L66,30 L78,30 L78,78 L68,78 L42,46 L42,78 Z" />
++
++    </group>
++
++</vector>
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+index 5a5c337..5d9d703 100644
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -83,7 +83,7 @@
+ 
+             <LinearLayout
+                 android:id="@+id/left_drawer"
+-                android:layout_width="240dp"
++                android:layout_width="280dp"
+                 android:layout_height="match_parent"
+                 android:layout_gravity="start"
+                 android:choiceMode="singleChoice"
+@@ -101,6 +101,7 @@
+                         android:id="@+id/settings_button"
+                         android:layout_width="40dp"
+                         android:layout_height="40dp"
++                        android:visibility="gone"
+                         android:src="@drawable/ic_settings"
+                         android:background="@null"
+                         android:contentDescription="@string/action_open_settings"
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+index def874a..a64b1c8 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+@@ -7,6 +7,7 @@ import android.text.TextWatcher
+ import android.view.View
+ import android.view.ViewGroup
+ import android.widget.Button
++import android.widget.ImageView
+ import android.widget.SeekBar
+ import android.widget.TextView
+ import androidx.appcompat.app.AppCompatActivity
+@@ -23,6 +24,15 @@ class SettingsActivity : AppCompatActivity() {
+     private lateinit var binding: NobicActivitySettingsBinding
+     private lateinit var prefs: EditorPreferences
+ 
++    private data class CategorySection(
++        val card: View,
++        val header: View,
++        val body: View,
++        val chevron: ImageView
++    )
++
++    private lateinit var categorySections: List<CategorySection>
++
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         binding = NobicActivitySettingsBinding.inflate(layoutInflater)
+@@ -41,6 +51,7 @@ class SettingsActivity : AppCompatActivity() {
+         loadPreferences()
+         setupListeners()
+         setupSettingsSearch()
++        setupCategoryCards()
+     }
+ 
+     private fun setupSettingsSearch() {
+@@ -51,30 +62,73 @@ class SettingsActivity : AppCompatActivity() {
+         })
+     }
+ 
+-    /** Settings rows ko query se filter karta hai; jiss section me kuch na mile uska header chhup jata hai. */
++    /** Category cards: tap par khulta/band hota hai (accordion — ek waqt me ek khula). */
++    private fun setupCategoryCards() {
++        categorySections = listOf(
++            CategorySection(binding.cardGeneral, binding.cardGeneralHeader, binding.bodyGeneral, binding.chevronGeneral),
++            CategorySection(binding.cardAppearance, binding.cardAppearanceHeader, binding.bodyAppearance, binding.chevronAppearance),
++            CategorySection(binding.cardEditor, binding.cardEditorHeader, binding.bodyEditor, binding.chevronEditor),
++            CategorySection(binding.cardCoding, binding.cardCodingHeader, binding.bodyCoding, binding.chevronCoding),
++            CategorySection(binding.cardFiles, binding.cardFilesHeader, binding.bodyFiles, binding.chevronFiles)
++        )
++        for (section in categorySections) {
++            section.header.setOnClickListener { toggleCategory(section) }
++        }
++        // Pehli category (General) khuli, baaki band — folder jaisa grouped view.
++        collapseAllCategories()
++        expandCategory(categorySections[0])
++    }
++
++    private fun toggleCategory(section: CategorySection) {
++        val wasExpanded = section.body.visibility == View.VISIBLE
++        collapseAllCategories()
++        if (!wasExpanded) expandCategory(section)
++    }
++
++    private fun expandCategory(section: CategorySection) {
++        section.body.visibility = View.VISIBLE
++        section.chevron.rotation = 180f
++    }
++
++    private fun collapseAllCategories() {
++        for (section in categorySections) {
++            section.body.visibility = View.GONE
++            section.chevron.rotation = 0f
++        }
++    }
++
++    /** Settings ko query se filter karta hai; matching category khul jati hai, baaki chhup jati hain. */
+     private fun filterSettings(query: String) {
+         val q = query.trim().lowercase()
+-        val container = binding.settingsContainer
++        if (!::categorySections.isInitialized) return
+         if (q.isEmpty()) {
+-            for (i in 0 until container.childCount) container.getChildAt(i).visibility = View.VISIBLE
++            for (section in categorySections) {
++                section.card.visibility = View.VISIBLE
++                val body = section.body as ViewGroup
++                for (i in 0 until body.childCount) body.getChildAt(i).visibility = View.VISIBLE
++            }
++            binding.btnResetSettings.visibility = View.VISIBLE
++            binding.versionText.visibility = View.VISIBLE
++            collapseAllCategories()
++            expandCategory(categorySections[0])
+             return
+         }
+-        var header: View? = null
+-        var headerShown = false
+-        for (i in 0 until container.childCount) {
+-            val child = container.getChildAt(i)
+-            if (child is TextView && child !is Button && child.id != R.id.versionText) {
+-                header?.visibility = if (headerShown) View.VISIBLE else View.GONE
+-                header = child
+-                headerShown = false
+-                child.visibility = View.GONE
++        for (section in categorySections) {
++            val body = section.body as ViewGroup
++            var anyMatch = false
++            for (i in 0 until body.childCount) {
++                val row = body.getChildAt(i)
++                val match = collectRowText(row).lowercase().contains(q)
++                row.visibility = if (match) View.VISIBLE else View.GONE
++                if (match) anyMatch = true
++            }
++            if (anyMatch) {
++                section.card.visibility = View.VISIBLE
++                expandCategory(section)
+             } else {
+-                val match = collectRowText(child).lowercase().contains(q)
+-                child.visibility = if (match) View.VISIBLE else View.GONE
+-                if (match) headerShown = true
++                section.card.visibility = View.GONE
+             }
+         }
+-        header?.visibility = if (headerShown) View.VISIBLE else View.GONE
+     }
+ 
+     private fun collectRowText(v: View): String {
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
+index 8afb395..bb4af33 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/preferences/EditorPreferences.kt
+@@ -129,7 +129,7 @@ class EditorPreferences(context: Context) {
+         set(value) = prefs.edit().putBoolean("syntax_highlight_v2", value).apply()
+ 
+     var minimap: Boolean
+-        get() = prefs.getBoolean("minimap", true)
++        get() = prefs.getBoolean("minimap", false)
+         set(value) = prefs.edit().putBoolean("minimap", value).apply()
+ 
+     var autoIndent: Boolean
+diff --git a/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml b/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
+index d53248d..2bfc9a6 100644
+--- a/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
++++ b/termux-app/nobicode/src/main/res/layout/nobic_activity_settings.xml
+@@ -45,35 +45,91 @@
+             android:layout_height="wrap_content"
+             android:orientation="vertical"
+             android:paddingBottom="24dp">
+-
+-            <!-- Appearance -->
+-            <TextView
++            <com.google.android.material.card.MaterialCardView
++                android:id="@+id/cardGeneral"
++                style="@style/Widget.Material3.CardView.Filled"
+                 android:layout_width="match_parent"
+                 android:layout_height="wrap_content"
+-                android:paddingStart="20dp"
+-                android:paddingTop="16dp"
+-                android:paddingBottom="8dp"
+-                android:text="Appearance"
+-                android:textColor="@color/primary"
+-                android:textSize="13sp"
+-                android:textStyle="bold" />
+-
+-            <LinearLayout
+-                android:id="@+id/rowTheme"
++                android:layout_marginStart="16dp"
++                android:layout_marginEnd="16dp"
++                android:layout_marginTop="16dp"
++                android:layout_marginBottom="8dp"
++                app:cardCornerRadius="16dp"
++                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
++
++                <LinearLayout
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:orientation="vertical">
++
++                    <LinearLayout
++                        android:id="@+id/cardGeneralHeader"
++                        android:layout_width="match_parent"
++                        android:layout_height="72dp"
++                        android:orientation="horizontal"
++                        android:gravity="center_vertical"
++                        android:paddingStart="16dp"
++                        android:paddingEnd="16dp"
++                        android:clickable="true"
++                        android:focusable="true"
++                        android:background="?attr/selectableItemBackground">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_settings"
++                            app:tint="@color/primary" />
++
++                        <LinearLayout
++                            android:layout_width="0dp"
++                            android:layout_height="wrap_content"
++                            android:layout_weight="1"
++                            android:orientation="vertical"
++                            android:paddingStart="16dp"
++                            android:paddingEnd="16dp">
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="General"
++                                android:textSize="16sp"
++                                android:textStyle="bold"
++                                android:textColor="?attr/colorOnSurface" />
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Device behaviour · 4 options"
++                                android:textSize="14sp"
++                                android:textColor="?attr/colorOnSurfaceVariant" />
++                        </LinearLayout>
++
++                        <ImageView
++                            android:id="@+id/chevronGeneral"
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_chevron_down"
++                            app:tint="?attr/colorOnSurfaceVariant" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/bodyGeneral"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:orientation="vertical"
++                        android:visibility="visible">
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp"
+-                android:clickable="true"
+-                android:focusable="true"
+-                android:background="?attr/selectableItemBackground">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_palette"
++                    android:src="@drawable/ic_keep_screen"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -87,42 +143,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Theme"
++                        android:text="Keep screen on"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+-                        android:id="@+id/themeSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Tokyo Night"
++                        android:text="Prevent screen timeout while editing"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <ImageView
+-                    android:layout_width="24dp"
+-                    android:layout_height="24dp"
+-                    android:src="@drawable/ic_chevron_right"
+-                    app:tint="?attr/colorOnSurfaceVariant" />
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchKeepScreenOn"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
+-                android:id="@+id/rowFontSize"
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp"
+-                android:clickable="true"
+-                android:focusable="true"
+-                android:background="?attr/selectableItemBackground">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_text_size"
++                    android:src="@drawable/ic_typewriter"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -136,50 +185,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Font size"
++                        android:text="Typewriter mode"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+-                        android:id="@+id/fontSizeSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="14 sp"
++                        android:text="Keep the caret line centered"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <ImageView
+-                    android:layout_width="24dp"
+-                    android:layout_height="24dp"
+-                    android:src="@drawable/ic_chevron_right"
+-                    app:tint="?attr/colorOnSurfaceVariant" />
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchTypewriterMode"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <!-- Editor -->
+-            <TextView
+-                android:layout_width="match_parent"
+-                android:layout_height="wrap_content"
+-                android:paddingStart="20dp"
+-                android:paddingTop="16dp"
+-                android:paddingBottom="8dp"
+-                android:text="Editor"
+-                android:textColor="@color/primary"
+-                android:textSize="13sp"
+-                android:textStyle="bold" />
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_wrap"
++                    android:src="@drawable/ic_code"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -193,36 +227,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Word wrap"
++                        android:text="Symbols bar"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Wrap long lines"
++                        android:text="Extra symbol keys above the footer"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchWordWrap"
++                    android:id="@+id/switchSymbolsBar"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_numbers"
++                    android:src="@drawable/ic_zoom"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -236,36 +269,116 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Line numbers"
++                        android:text="Pinch to zoom"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Show gutter line numbers"
++                        android:text="Two-finger gesture changes font size"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchLineNumbers"
++                    android:id="@+id/switchPinchZoom"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
++                    </LinearLayout>
++                </LinearLayout>
++            </com.google.android.material.card.MaterialCardView>
++
++            <com.google.android.material.card.MaterialCardView
++                android:id="@+id/cardAppearance"
++                style="@style/Widget.Material3.CardView.Filled"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginStart="16dp"
++                android:layout_marginEnd="16dp"
++                android:layout_marginTop="8dp"
++                android:layout_marginBottom="8dp"
++                app:cardCornerRadius="16dp"
++                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+ 
+-            <LinearLayout
++                <LinearLayout
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:orientation="vertical">
++
++                    <LinearLayout
++                        android:id="@+id/cardAppearanceHeader"
++                        android:layout_width="match_parent"
++                        android:layout_height="72dp"
++                        android:orientation="horizontal"
++                        android:gravity="center_vertical"
++                        android:paddingStart="16dp"
++                        android:paddingEnd="16dp"
++                        android:clickable="true"
++                        android:focusable="true"
++                        android:background="?attr/selectableItemBackground">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_palette"
++                            app:tint="@color/primary" />
++
++                        <LinearLayout
++                            android:layout_width="0dp"
++                            android:layout_height="wrap_content"
++                            android:layout_weight="1"
++                            android:orientation="vertical"
++                            android:paddingStart="16dp"
++                            android:paddingEnd="16dp">
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Appearance"
++                                android:textSize="16sp"
++                                android:textStyle="bold"
++                                android:textColor="?attr/colorOnSurface" />
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Look and feel · 6 options"
++                                android:textSize="14sp"
++                                android:textColor="?attr/colorOnSurfaceVariant" />
++                        </LinearLayout>
++
++                        <ImageView
++                            android:id="@+id/chevronAppearance"
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_chevron_down"
++                            app:tint="?attr/colorOnSurfaceVariant" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/bodyAppearance"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:orientation="vertical"
++                        android:visibility="gone">
++<LinearLayout
++                android:id="@+id/rowTheme"
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_fold"
++                    android:src="@drawable/ic_palette"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -279,36 +392,41 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Code folding"
++                        android:text="Theme"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
++                        android:id="@+id/themeSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Collapse functions and blocks"
++                        android:text="Tokyo Night"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchFolding"
+-                    android:layout_width="wrap_content"
+-                    android:layout_height="wrap_content" />
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
++                android:id="@+id/rowFontSize"
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_sticky"
++                    android:src="@drawable/ic_text_size"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -322,30 +440,31 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Sticky scroll"
++                        android:text="Font size"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
++                        android:id="@+id/fontSizeSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Pin current function header on top"
++                        android:text="14 sp"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchStickyScroll"
+-                    android:layout_width="wrap_content"
+-                    android:layout_height="wrap_content" />
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+@@ -382,13 +501,12 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+@@ -425,19 +543,18 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_indent_guides"
++                    android:src="@drawable/ic_whitespace"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -451,36 +568,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Indent guides"
++                        android:text="Show whitespace"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Show vertical indent level lines"
++                        android:text="Show spaces and tabs as marks"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchIndentGuides"
++                    android:id="@+id/switchShowWhitespace"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_trim"
++                    android:src="@drawable/ic_symbol"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -494,36 +610,112 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Trim trailing whitespace"
++                        android:text="Rainbow brackets"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Clean line ends on save"
++                        android:text="Color nested brackets by depth"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchTrimWhitespace"
++                    android:id="@+id/switchRainbowBrackets"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
++                    </LinearLayout>
++                </LinearLayout>
++            </com.google.android.material.card.MaterialCardView>
+ 
+-            <LinearLayout
++            <com.google.android.material.card.MaterialCardView
++                android:id="@+id/cardEditor"
++                style="@style/Widget.Material3.CardView.Filled"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginStart="16dp"
++                android:layout_marginEnd="16dp"
++                android:layout_marginTop="8dp"
++                android:layout_marginBottom="8dp"
++                app:cardCornerRadius="16dp"
++                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
++
++                <LinearLayout
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:orientation="vertical">
++
++                    <LinearLayout
++                        android:id="@+id/cardEditorHeader"
++                        android:layout_width="match_parent"
++                        android:layout_height="72dp"
++                        android:orientation="horizontal"
++                        android:gravity="center_vertical"
++                        android:paddingStart="16dp"
++                        android:paddingEnd="16dp"
++                        android:clickable="true"
++                        android:focusable="true"
++                        android:background="?attr/selectableItemBackground">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_code"
++                            app:tint="@color/primary" />
++
++                        <LinearLayout
++                            android:layout_width="0dp"
++                            android:layout_height="wrap_content"
++                            android:layout_weight="1"
++                            android:orientation="vertical"
++                            android:paddingStart="16dp"
++                            android:paddingEnd="16dp">
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Editor"
++                                android:textSize="16sp"
++                                android:textStyle="bold"
++                                android:textColor="?attr/colorOnSurface" />
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Text editing basics · 8 options"
++                                android:textSize="14sp"
++                                android:textColor="?attr/colorOnSurfaceVariant" />
++                        </LinearLayout>
++
++                        <ImageView
++                            android:id="@+id/chevronEditor"
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_chevron_down"
++                            app:tint="?attr/colorOnSurfaceVariant" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/bodyEditor"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:orientation="vertical"
++                        android:visibility="gone">
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_paste_indent"
++                    android:src="@drawable/ic_wrap"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -537,36 +729,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Auto-indent on paste"
++                        android:text="Word wrap"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Match indent when pasting"
++                        android:text="Wrap long lines"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchAutoIndentPaste"
++                    android:id="@+id/switchWordWrap"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_text_size"
++                    android:src="@drawable/ic_numbers"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -580,40 +771,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Font ligatures"
++                        android:text="Line numbers"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Render -&gt;, =&gt;, != as single symbols"
++                        android:text="Show gutter line numbers"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchFontLigatures"
++                    android:id="@+id/switchLineNumbers"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
+-                android:id="@+id/rowLineSpacing"
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp"
+-                android:clickable="true"
+-                android:focusable="true"
+-                android:background="?attr/selectableItemBackground">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_text_size"
++                    android:src="@drawable/ic_fold"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -627,32 +813,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Line spacing"
++                        android:text="Code folding"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+-                        android:id="@+id/lineSpacingSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="100%"
++                        android:text="Collapse functions and blocks"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+-            </LinearLayout>
+ 
+-            <LinearLayout
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchFolding"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
++            </LinearLayout>
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_keep_screen"
++                    android:src="@drawable/ic_sticky"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -666,36 +855,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Keep screen on"
++                        android:text="Sticky scroll"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Prevent screen timeout while editing"
++                        android:text="Pin current function header on top"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchKeepScreenOn"
++                    android:id="@+id/switchStickyScroll"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_typewriter"
++                    android:src="@drawable/ic_indent_guides"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -709,36 +897,39 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Typewriter mode"
++                        android:text="Indent guides"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Keep the caret line centered"
++                        android:text="Show vertical indent level lines"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchTypewriterMode"
++                    android:id="@+id/switchIndentGuides"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
++                android:id="@+id/rowLineSpacing"
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_code"
++                    android:src="@drawable/ic_text_size"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -752,36 +943,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Symbols bar"
++                        android:text="Line spacing"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
++                        android:id="@+id/lineSpacingSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Extra symbol keys above the footer"
++                        android:text="100%"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+-
+-                <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchSymbolsBar"
+-                    android:layout_width="wrap_content"
+-                    android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
++                android:id="@+id/rowTabSize"
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_whitespace"
++                    android:src="@drawable/ic_tab"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -795,36 +985,41 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Show whitespace"
++                        android:text="Tab size"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
++                        android:id="@+id/tabSizeSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Show spaces and tabs as marks"
++                        android:text="4 Spaces"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchShowWhitespace"
+-                    android:layout_width="wrap_content"
+-                    android:layout_height="wrap_content" />
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
++                android:id="@+id/rowLineGuide"
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp"
++                android:clickable="true"
++                android:focusable="true"
++                android:background="?attr/selectableItemBackground">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_symbol"
++                    android:src="@drawable/ic_ruler"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -838,36 +1033,114 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Rainbow brackets"
++                        android:text="Line length guide"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
++                        android:id="@+id/lineGuideSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Color nested brackets by depth"
++                        android:text="Off"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchRainbowBrackets"
+-                    android:layout_width="wrap_content"
+-                    android:layout_height="wrap_content" />
++                <ImageView
++                    android:layout_width="24dp"
++                    android:layout_height="24dp"
++                    android:src="@drawable/ic_chevron_right"
++                    app:tint="?attr/colorOnSurfaceVariant" />
+             </LinearLayout>
++                    </LinearLayout>
++                </LinearLayout>
++            </com.google.android.material.card.MaterialCardView>
+ 
+-            <LinearLayout
++            <com.google.android.material.card.MaterialCardView
++                android:id="@+id/cardCoding"
++                style="@style/Widget.Material3.CardView.Filled"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginStart="16dp"
++                android:layout_marginEnd="16dp"
++                android:layout_marginTop="8dp"
++                android:layout_marginBottom="8dp"
++                app:cardCornerRadius="16dp"
++                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
++
++                <LinearLayout
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:orientation="vertical">
++
++                    <LinearLayout
++                        android:id="@+id/cardCodingHeader"
++                        android:layout_width="match_parent"
++                        android:layout_height="72dp"
++                        android:orientation="horizontal"
++                        android:gravity="center_vertical"
++                        android:paddingStart="16dp"
++                        android:paddingEnd="16dp"
++                        android:clickable="true"
++                        android:focusable="true"
++                        android:background="?attr/selectableItemBackground">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_brackets"
++                            app:tint="@color/primary" />
++
++                        <LinearLayout
++                            android:layout_width="0dp"
++                            android:layout_height="wrap_content"
++                            android:layout_weight="1"
++                            android:orientation="vertical"
++                            android:paddingStart="16dp"
++                            android:paddingEnd="16dp">
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Coding assistance"
++                                android:textSize="16sp"
++                                android:textStyle="bold"
++                                android:textColor="?attr/colorOnSurface" />
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Helpers while you code · 7 options"
++                                android:textSize="14sp"
++                                android:textColor="?attr/colorOnSurfaceVariant" />
++                        </LinearLayout>
++
++                        <ImageView
++                            android:id="@+id/chevronCoding"
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_chevron_down"
++                            app:tint="?attr/colorOnSurfaceVariant" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/bodyCoding"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:orientation="vertical"
++                        android:visibility="gone">
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_brackets"
++                    android:src="@drawable/ic_indent_in"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -881,40 +1154,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Auto-close brackets"
++                        android:text="Auto-indent"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Insert closing bracket automatically"
++                        android:text="Indent new lines automatically"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchAutoClose"
++                    android:id="@+id/switchAutoIndent"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
+-                android:id="@+id/rowTabSize"
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp"
+-                android:clickable="true"
+-                android:focusable="true"
+-                android:background="?attr/selectableItemBackground">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_tab"
++                    android:src="@drawable/ic_paste_indent"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -928,42 +1196,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Tab size"
++                        android:text="Auto-indent on paste"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+-                        android:id="@+id/tabSizeSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="4 Spaces"
++                        android:text="Match indent when pasting"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <ImageView
+-                    android:layout_width="24dp"
+-                    android:layout_height="24dp"
+-                    android:src="@drawable/ic_chevron_right"
+-                    app:tint="?attr/colorOnSurfaceVariant" />
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchAutoIndentPaste"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
+-                android:id="@+id/rowLineGuide"
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
+-                android:paddingEnd="16dp"
+-                android:clickable="true"
+-                android:focusable="true"
+-                android:background="?attr/selectableItemBackground">
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_ruler"
++                    android:src="@drawable/ic_brackets"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -977,32 +1238,29 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Line length guide"
++                        android:text="Auto-close brackets"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+-                        android:id="@+id/lineGuideSubtitle"
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Off"
++                        android:text="Insert closing bracket automatically"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+-                <ImageView
+-                    android:layout_width="24dp"
+-                    android:layout_height="24dp"
+-                    android:src="@drawable/ic_chevron_right"
+-                    app:tint="?attr/colorOnSurfaceVariant" />
++                <com.google.android.material.switchmaterial.SwitchMaterial
++                    android:id="@+id/switchAutoClose"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+@@ -1039,19 +1297,18 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_indent_in"
++                    android:src="@drawable/ic_lang_web"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -1065,36 +1322,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Auto-indent"
++                        android:text="Emmet"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Indent new lines automatically"
++                        android:text="Expand abbreviations with Tab in HTML/XML"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchAutoIndent"
++                    android:id="@+id/switchEmmet"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_zoom"
++                    android:src="@drawable/ic_text_size"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -1108,36 +1364,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Pinch to zoom"
++                        android:text="Font ligatures"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Two-finger gesture changes font size"
++                        android:text="Render -&gt;, =&gt;, != as single symbols"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchPinchZoom"
++                    android:id="@+id/switchFontLigatures"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_lang_web"
++                    android:src="@drawable/ic_trim"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -1151,48 +1406,112 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Emmet"
++                        android:text="Trim trailing whitespace"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Expand abbreviations with Tab in HTML/XML"
++                        android:text="Clean line ends on save"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchEmmet"
++                    android:id="@+id/switchTrimWhitespace"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
++                    </LinearLayout>
++                </LinearLayout>
++            </com.google.android.material.card.MaterialCardView>
+ 
+-            <!-- Files -->
+-            <TextView
++            <com.google.android.material.card.MaterialCardView
++                android:id="@+id/cardFiles"
++                style="@style/Widget.Material3.CardView.Filled"
+                 android:layout_width="match_parent"
+                 android:layout_height="wrap_content"
+-                android:paddingStart="20dp"
+-                android:paddingTop="16dp"
+-                android:paddingBottom="8dp"
+-                android:text="Files"
+-                android:textColor="@color/primary"
+-                android:textSize="13sp"
+-                android:textStyle="bold" />
+-
+-            <LinearLayout
++                android:layout_marginStart="16dp"
++                android:layout_marginEnd="16dp"
++                android:layout_marginTop="8dp"
++                android:layout_marginBottom="8dp"
++                app:cardCornerRadius="16dp"
++                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
++
++                <LinearLayout
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:orientation="vertical">
++
++                    <LinearLayout
++                        android:id="@+id/cardFilesHeader"
++                        android:layout_width="match_parent"
++                        android:layout_height="72dp"
++                        android:orientation="horizontal"
++                        android:gravity="center_vertical"
++                        android:paddingStart="16dp"
++                        android:paddingEnd="16dp"
++                        android:clickable="true"
++                        android:focusable="true"
++                        android:background="?attr/selectableItemBackground">
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_folder_open"
++                            app:tint="@color/primary" />
++
++                        <LinearLayout
++                            android:layout_width="0dp"
++                            android:layout_height="wrap_content"
++                            android:layout_weight="1"
++                            android:orientation="vertical"
++                            android:paddingStart="16dp"
++                            android:paddingEnd="16dp">
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Files &amp; saving"
++                                android:textSize="16sp"
++                                android:textStyle="bold"
++                                android:textColor="?attr/colorOnSurface" />
++
++                            <TextView
++                                android:layout_width="wrap_content"
++                                android:layout_height="wrap_content"
++                                android:text="Files on disk · 5 options"
++                                android:textSize="14sp"
++                                android:textColor="?attr/colorOnSurfaceVariant" />
++                        </LinearLayout>
++
++                        <ImageView
++                            android:id="@+id/chevronFiles"
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:src="@drawable/ic_chevron_down"
++                            app:tint="?attr/colorOnSurfaceVariant" />
++                    </LinearLayout>
++
++                    <LinearLayout
++                        android:id="@+id/bodyFiles"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:orientation="vertical"
++                        android:visibility="gone">
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_save"
++                    android:src="@drawable/ic_visibility"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -1206,36 +1525,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Auto-save"
++                        android:text="Hide hidden files"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Save files automatically"
++                        android:text="Hide files starting with a dot"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchAutoSave"
++                    android:id="@+id/switchHideHiddenFiles"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_visibility"
++                    android:src="@drawable/ic_text_size"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -1249,30 +1567,30 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Hide hidden files"
++                        android:text="Insert final newline"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Hide files starting with a dot"
++                        android:text="End files with a newline on save"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchHideHiddenFiles"
++                    android:id="@+id/switchInsertFinalNewline"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<!-- v6 (12): format on save toggle. -->
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+@@ -1292,37 +1610,35 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Insert final newline"
++                        android:text="Format on save"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="End files with a newline on save"
++                        android:text="Reindent brace code and trim trailing whitespace on save"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchInsertFinalNewline"
++                    android:id="@+id/switchFormatOnSave"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <!-- v6 (12): format on save toggle. -->
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+                     android:layout_width="24dp"
+                     android:layout_height="24dp"
+-                    android:src="@drawable/ic_text_size"
++                    android:src="@drawable/ic_save"
+                     app:tint="@color/primary" />
+ 
+                 <LinearLayout
+@@ -1336,30 +1652,29 @@
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Format on save"
++                        android:text="Auto-save"
+                         android:textSize="16sp"
+                         android:textColor="?attr/colorOnSurface" />
+ 
+                     <TextView
+                         android:layout_width="wrap_content"
+                         android:layout_height="wrap_content"
+-                        android:text="Reindent brace code and trim trailing whitespace on save"
++                        android:text="Save files automatically"
+                         android:textSize="14sp"
+                         android:textColor="?attr/colorOnSurfaceVariant" />
+                 </LinearLayout>
+ 
+                 <com.google.android.material.switchmaterial.SwitchMaterial
+-                    android:id="@+id/switchFormatOnSave"
++                    android:id="@+id/switchAutoSave"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
+-
+-            <LinearLayout
++<LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="72dp"
+                 android:orientation="horizontal"
+                 android:gravity="center_vertical"
+-                android:paddingStart="20dp"
++                android:paddingStart="16dp"
+                 android:paddingEnd="16dp">
+ 
+                 <ImageView
+@@ -1396,6 +1711,9 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content" />
+             </LinearLayout>
++                    </LinearLayout>
++                </LinearLayout>
++            </com.google.android.material.card.MaterialCardView>
+ 
+             <com.google.android.material.button.MaterialButton
+                 android:id="@+id/btnResetSettings"
+@@ -1405,6 +1723,7 @@
+                 android:layout_margin="20dp"
+                 android:text="Reset settings to defaults" />
+ 
++
+             <TextView
+                 android:id="@+id/versionText"
+                 android:layout_width="wrap_content"
+@@ -1415,6 +1734,7 @@
+                 android:textSize="12sp"
+                 android:textColor="?attr/colorOnSurfaceVariant" />
+ 
++
+         </LinearLayout>
+     </ScrollView>
+ </LinearLayout>
+diff --git a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java
+index 4fbbf1e..2725b42 100644
+--- a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java
++++ b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java
+@@ -397,6 +397,11 @@ public final class ExtraKeysView extends GridLayout {
+         setRowCount(buttons.length);
+         setColumnCount(maximumLength(buttons));
+ 
++        // v8 sizing: 1.5dp gap on each side of every key, so keys stop
++        // touching each other. Row height is unchanged (rowSpec FILL),
++        // and no key is added, removed, reordered or re-handled.
++        int keyGapPx = (int) (1.5f * getResources().getDisplayMetrics().density + 0.5f);
++
+         for (int row = 0; row < buttons.length; row++) {
+             for (int col = 0; col < buttons[row].length; col++) {
+                 final ExtraKeyButton buttonInfo = buttons[row][col];
+@@ -476,7 +481,7 @@ public final class ExtraKeysView extends GridLayout {
+                 } else {
+                     param.height = 0;
+                 }
+-                param.setMargins(0, 0, 0, 0);
++                param.setMargins(keyGapPx, 0, keyGapPx, 0);
+                 param.columnSpec = GridLayout.spec(col, GridLayout.FILL, 1.f);
+                 param.rowSpec = GridLayout.spec(row, GridLayout.FILL, 1.f);
+                 button.setLayoutParams(param);
