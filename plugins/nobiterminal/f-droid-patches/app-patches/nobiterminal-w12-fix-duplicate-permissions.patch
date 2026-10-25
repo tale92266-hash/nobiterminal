@@ -1,0 +1,11 @@
+diff --git a/termux-app/app/src/main/res/values/nobi_permissions_strings.xml b/termux-app/app/src/main/res/values/nobi_permissions_strings.xml
+--- a/termux-app/app/src/main/res/values/nobi_permissions_strings.xml
++++ b/termux-app/app/src/main/res/values/nobi_permissions_strings.xml
+@@ -1,7 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+     <!-- v10: Notifications screen + Permissions hub. All UI text English. -->
+-    <string name="nobi_menu_permissions">Permissions</string>
+     <string name="nobi_notifications_title">Notifications</string>
+     <string name="nobi_notifications_view">View notifications</string>
+     <string name="nobi_notifications_empty_no_access">Notification access is off, so there is nothing to show here. Turn it on to read your notifications inside NobiTerminal. Nothing is sent anywhere.</string>
