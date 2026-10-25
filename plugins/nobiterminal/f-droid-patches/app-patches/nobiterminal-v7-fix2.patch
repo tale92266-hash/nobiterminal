@@ -1,0 +1,12 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -1933,7 +1933,7 @@
+         // fling down opens the drawer, double-tap on EMPTY bar space opens
+         // the editor (double-tap on a tab itself stays tab rename).
+         View tabsScroll = findViewById(R.id.nobi_tabs_scroll_view);
+-        final View tabsContainer = findViewById(R.id.nobi_tabs_container);
++        final ViewGroup tabsContainer = findViewById(R.id.nobi_tabs_container);
+         if (tabsScroll != null) {
+             final android.view.GestureDetector detector =
+                 new android.view.GestureDetector(this,
