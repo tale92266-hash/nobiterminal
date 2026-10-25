@@ -1,0 +1,93 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+index b327a80..d6a43d9 100644
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -1766,6 +1766,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
+             menu.addView(row);
+         }
+         for (View leftover : byKey.values()) menu.addView(leftover);
++
++        // v9 (drawer footer): upstream Termux added a drawer footer bar
++        // (drawer_buttons) holding KEYBOARD / NEW SESSION / NEW WINDOW
++        // buttons, and setNewWindowButtonView() forces that bar VERTICAL
++        // and its third button VISIBLE on SDK >= 24 — that is exactly the
++        // all-caps stack Sam saw under Exit in v8. It is NOT the extra
++        // keys bar: the v8 sanitizer already filters the property, and
++        // the bar on screen shows only its 2 real rows. Hiding the whole
++        // bar wins over any child visibility the upstream code sets, the
++        // null check covers layouts without the bar, and the drawer menu
++        // rows (New Window / New Session) are separate views above this
++        // bar and are left untouched.
++        View drawerButtons = findViewById(R.id.drawer_buttons);
++        if (drawerButtons != null) drawerButtons.setVisibility(View.GONE);
+     }
+ 
+     private android.graphics.drawable.Drawable mNobiDrawerOriginalBg = null;
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxService.java b/termux-app/app/src/main/java/com/termux/app/TermuxService.java
+index 6180f3d..64c1712 100644
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxService.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxService.java
+@@ -829,6 +829,26 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
+         // matching the N icon, instead of the old Termux grey-blue)
+         builder.setColor(0xFF22D3EE);
+ 
++        // v9: explicit large icon. The small icon above is already the
++        // white N vector (verified in the v8 APK) and no code path posts
++        // the old Termux icon, so a >_ icon in the shade can only be a
++        // stale system/launcher icon cache from before the v8 icon
++        // change. An explicit large icon makes the notification itself
++        // carry the N art instead of relying on any cached app icon.
++        // Guarded so a drawable failure can never break the foreground
++        // notification.
++        try {
++            android.graphics.drawable.Drawable largeIconDrawable = getDrawable(R.drawable.nobi_app_icon);
++            if (largeIconDrawable != null) {
++                android.graphics.Bitmap largeIconBitmap = android.graphics.Bitmap.createBitmap(256, 256, android.graphics.Bitmap.Config.ARGB_8888);
++                android.graphics.Canvas largeIconCanvas = new android.graphics.Canvas(largeIconBitmap);
++                largeIconDrawable.setBounds(0, 0, 256, 256);
++                largeIconDrawable.draw(largeIconCanvas);
++                builder.setLargeIcon(largeIconBitmap);
++            }
++        } catch (Exception ignored) {
++        }
++
+         // TermuxSessions are always ongoing
+         builder.setOngoing(true);
+ 
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+index 5d9d703..deb0c21 100644
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -430,7 +430,7 @@
+             android:visibility="gone"
+             android:layout_width="match_parent"
+             android:layout_height="37.5dp"
+-            android:background="@color/black"
++            android:background="?attr/termuxActivityDrawerBackground"
+             android:layout_alignParentBottom="true" />
+ 
+         <!-- v7 (83): floating quick-actions button, above the extra keys. -->
+diff --git a/termux-app/app/src/main/res/values-night/themes.xml b/termux-app/app/src/main/res/values-night/themes.xml
+index 3fe66c1..e69952b 100644
+--- a/termux-app/app/src/main/res/values-night/themes.xml
++++ b/termux-app/app/src/main/res/values-night/themes.xml
+@@ -27,7 +27,7 @@
+ 
+         <!-- Left drawer. -->
+         <item name="buttonBarButtonStyle">@style/TermuxActivity.Drawer.ButtonBarStyle.Dark</item>
+-        <item name="termuxActivityDrawerBackground">@color/black</item>
++        <item name="termuxActivityDrawerBackground">@color/nobi_navy</item>
+         <item name="termuxActivityDrawerImageTint">@color/white</item>
+ 
+         <!-- Extra keys colors. -->
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index 4bdf832..18ae86d 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -3,4 +3,6 @@
+     <!-- NobiTerminal brand navy, used as launcher icon and splash background. -->
+     <color name="nobi_icon_background">#070B1F</color>
+     <color name="nobi_splash_background">#070B1F</color>
++    <!-- v9: drawer + keys-bar navy, same as the tabs bar (#FF0A0F24). -->
++    <color name="nobi_navy">#FF0A0F24</color>
+ </resources>
