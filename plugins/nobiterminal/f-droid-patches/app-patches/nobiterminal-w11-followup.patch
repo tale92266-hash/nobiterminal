@@ -1,0 +1,2627 @@
+diff -ruN a/termux-app/nobicode/src/main/AndroidManifest.xml b/termux-app/nobicode/src/main/AndroidManifest.xml
+diff --git a/termux-app/nobicode/src/main/AndroidManifest.xml b/termux-app/nobicode/src/main/AndroidManifest.xml
+--- a/termux-app/nobicode/src/main/AndroidManifest.xml	2026-10-25 15:41:08.097999391 +0000
++++ b/termux-app/nobicode/src/main/AndroidManifest.xml	2026-10-25 15:41:08.464220882 +0000
+@@ -36,6 +36,11 @@
+             android:theme="@style/Theme.NobiCode" />
+ 
+         <activity
++            android:name=".followup.FollowupSplitActivity"
++            android:exported="false"
++            android:theme="@style/Theme.NobiCode" />
++
++        <activity
+             android:name=".compare.CompareActivity"
+             android:exported="false"
+             android:theme="@style/Theme.NobiCode" />
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt	2026-10-25 15:41:07.837999391 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt	2026-10-25 15:41:08.184999391 +0000
+@@ -71,6 +71,19 @@
+ import com.nobidev.nobicode.model.MenuActionAdapter
+ import com.nobidev.nobicode.model.MenuItemData
+ import com.nobidev.nobicode.preferences.EditorPreferences
++import androidx.recyclerview.widget.ItemTouchHelper
++import com.google.android.material.snackbar.Snackbar
++import com.nobidev.nobicode.followup.FollowupCheatSheets
++import com.nobidev.nobicode.followup.FollowupDiff
++import com.nobidev.nobicode.followup.FollowupEncoding
++import com.nobidev.nobicode.followup.FollowupFuzzy
++import com.nobidev.nobicode.followup.FollowupHex
++import com.nobidev.nobicode.followup.FollowupLint
++import com.nobidev.nobicode.followup.FollowupSplitActivity
++import com.nobidev.nobicode.followup.FollowupStore
++import com.nobidev.nobicode.followup.FollowupSymbols
++import com.nobidev.nobicode.followup.FollowupTemplates
++import com.nobidev.nobicode.followup.FollowupTour
+ import com.nobidev.nobicode.theme.ThemeManager
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.Job
+@@ -213,6 +226,7 @@
+         setupFooterToolbar()
+         setupEditor()
+         setupZenMode()
++        setupFollowup()
+ 
+         restoreSessionState()
+ 
+@@ -1138,7 +1152,11 @@
+                     showCommandPalette()
+                     true
+                 }
+-                                R.id.action_quick_switch -> {
++                                R.id.action_followup -> {
++                    showFollowupMenu()
++                    true
++                }
++                R.id.action_quick_switch -> {
+                     showQuickSwitcher()
+                     true
+                 }
+@@ -1778,9 +1796,7 @@
+      * insert hota hai (smart typing — auto-close — bhi lagta hai).
+      */
+     private fun setupSymbolsBar() {
+-        val symbols = listOf("Tab", "(", ")", "{", "}", "[", "]", ";", ":", ",", ".",
+-            "\"", "'", "=", "+", "-", "*", "/", "<", ">", "!", "?", "&", "|",
+-            "_", "#", "$", "@", "\\", "~", "^", "%")
++        val symbols = FollowupSymbols.symbolsFor(currentFileExtension())
+         // Long-press par milne wale operator variants.
+         val longPressVariants = mapOf(
+             "=" to listOf("==", "=>", "!="),
+@@ -1800,6 +1816,7 @@
+             "'" to listOf("'".repeat(3))
+         )
+         val container = binding.symbolsContainer
++        container.removeAllViews()
+         val density = resources.displayMetrics.density
+         for (sym in symbols) {
+             val btn = android.widget.Button(this, null, android.R.attr.borderlessButtonStyle).apply {
+@@ -1889,7 +1906,8 @@
+         val le = if (t != null && t.contains("\r\n")) "CRLF" else "LF"
+         val indentInfo = "Spaces: ${prefs.tabSize}"
+         val roInfo = if (prefs.readOnly) " \u2022 Read-only" else ""
+-        binding.statusEncoding.text = "UTF-8 \u2022 $le \u2022 $indentInfo$roInfo"
++        val followupEnc = FollowupStore.encodingFor(this, openTabs.getOrNull(activeTabIndex)?.uri?.toString())
++        binding.statusEncoding.text = "$followupEnc \u2022 $le \u2022 $indentInfo$roInfo"
+     }
+ 
+     private fun updateEmptyState() {
+@@ -2783,6 +2801,7 @@
+         val cached = folderCache.get(folderKey)
+         if (cached != null) {
+             lastDrawerBase = filterHiddenFiles(cached)
++            lastDrawerBase = applyFollowupBrowserSortFilter(lastDrawerBase)
+             submitDrawerList(isNotAtRoot)
+             return
+         }
+@@ -2795,6 +2814,7 @@
+ 
+             folderCache.put(folderKey, resultItems)
+             lastDrawerBase = filterHiddenFiles(resultItems)
++            lastDrawerBase = applyFollowupBrowserSortFilter(lastDrawerBase)
+             submitDrawerList(isNotAtRoot)
+             // v7 (60): tell the terminal where the editor is looking.
+             writeEditorFolderFile()
+@@ -3109,7 +3129,7 @@
+                         for (i in 0 until checkLen) {
+                             if (bytes[i] == 0.toByte()) { bin = true; break }
+                         }
+-                        String(bytes, Charsets.UTF_8) to bin
++                        String(bytes, FollowupEncoding.charsetFor(FollowupStore.encodingFor(this, docFile.uri.toString()))) to bin
+                     } ?: ("" to false)
+                 } catch (e: Exception) {
+                     "" to false
+@@ -3160,6 +3180,10 @@
+         breadcrumbSymbolsDirty = true
+         val target = openTabs[index]
+         trackRecentFile(target)
++        // v11 follow-up (4)(2)(8): recent persist, fast mode, per-language symbols.
++        FollowupStore.recordRecent(this, target.uri?.toString(), target.name)
++        applyFollowupFastMode(target)
++        setupSymbolsBar()
+ 
+         binding.editor.setTextCleanly(target.content)
+         binding.editor.setSelection(target.cursorPosition.coerceIn(0, target.content.length))
+@@ -5710,6 +5734,9 @@
+             textToSave = formatCodeForSave(textToSave, ext)
+         }
+ 
++        // v11 follow-up (19): stored line ending applies at save time.
++        textToSave = applyFollowupSaveText(tab, textToSave)
++
+         if (tab.uri != null) {
+             // v7 (41): remote tab — upload back to the server first.
+             if (tab.remotePath != null) {
+@@ -5755,7 +5782,7 @@
+         if (tab.uri == null) return
+         try {
+             contentResolver.openOutputStream(tab.uri!!, "wt")?.use { out ->
+-                out.write(textToSave.toByteArray())
++                out.write(textToSave.toByteArray(FollowupEncoding.charsetFor(FollowupStore.encodingFor(this, tab.uri?.toString()))))
+             }
+             tab.content = textToSave
+             tab.diskContent = textToSave
+@@ -13529,4 +13556,1400 @@
+         dialog.show()
+     }
+ 
++
++    // ============ v11 follow-up: Editor tools (22 features) ============
++    // Har tool Editor tools menu (toolbar overflow) se khulta hai, aur
++    // kuch automatic hain: per-language symbols (tab switch par),
++    // recent-files recording (tab switch par), large-file fast mode
++    // (tab switch par), lint squiggles (edit ke 500 ms baad, background
++    // thread par compute), drawer swipe aur editor swipe/tap gestures.
++    // Koi tool UI thread par heavy kaam nahi karta: file walk, diff,
++    // lint, decode sab Dispatchers.IO/Default par; list results capped.
++
++    private data class FollowupTool(val id: String, val title: String, val run: () -> Unit)
++
++    private val followupLintHandler = Handler(Looper.getMainLooper())
++    private var followupLintRunnable: Runnable? = null
++    private var followupLintIssues: List<FollowupLint.Issue> = emptyList()
++    private val followupLintSpans = ArrayList<android.text.style.UnderlineSpan>()
++    private var followupLastFastTabId: String? = null
++
++    private fun currentFileExtension(): String {
++        return openTabs.getOrNull(activeTabIndex)?.name
++            ?.substringAfterLast('.', "")?.lowercase() ?: ""
++    }
++
++    private fun followupAllTools(): List<FollowupTool> {
++        return listOf(
++            FollowupTool("quick_switch", "Quick file switcher") { showFollowupQuickSwitcher() },
++            FollowupTool("recent", "Recent files") { showFollowupRecent() },
++            FollowupTool("hex", "Hex color picker") { showFollowupHexPicker() },
++            FollowupTool("templates", "File templates") { showFollowupTemplates() },
++            FollowupTool("image_preview", "Image path preview") { showFollowupImagePreview() },
++            FollowupTool("sort_filter", "File browser sort + filter") { showFollowupSortFilter() },
++            FollowupTool("workspaces", "Workspaces") { showFollowupWorkspaces() },
++            FollowupTool("cheat_sheets", "Offline cheat sheets") { showFollowupCheatSheets() },
++            FollowupTool("diff", "File compare / diff view") { showFollowupDiffPicker() },
++            FollowupTool("find_replace", "Find & replace with preview") { showFollowupFindReplacePreview() },
++            FollowupTool("split", "Split editor panes") { showFollowupSplit() },
++            FollowupTool("terminal_folder", "Open terminal in file's folder") { openTerminalHere() },
++            FollowupTool("lint", "Offline lint issues") { showFollowupLintDialog() },
++            FollowupTool("encoding", "Encoding + line ending") { showFollowupEncodingDialog() },
++            FollowupTool("share", "Share file out") { showFollowupShare() },
++            FollowupTool("file_info", "File info") { showFollowupFileInfo() },
++            FollowupTool("send_terminal", "Send selection to terminal") { showFollowupSendToTerminal() },
++            FollowupTool("save_clipboard", "Save clipboard text as new file") { showFollowupSaveClipboard() },
++            FollowupTool("tour", "Editor tour") { showFollowupTour(force = true) },
++            FollowupTool("custom_toolbar", "Customise toolbar") { showFollowupToolbarCustomiser() },
++            FollowupTool("fast_mode", "Large file fast mode") { showFollowupFastModeInfo() }
++        )
++    }
++
++    private fun showFollowupMenu() {
++        val all = followupAllTools()
++        val byId = all.associateBy { it.id }
++        val order = FollowupStore.toolbarOrder(this)
++        val disabled = FollowupStore.toolbarDisabled(this)
++        val visible = ArrayList<FollowupTool>()
++        for (id in order) {
++            val tool = byId[id]
++            if (tool != null && id !in disabled) visible.add(tool)
++        }
++        for (tool in all) {
++            if (tool.id !in order && tool.id !in disabled) visible.add(tool)
++        }
++        if (visible.isEmpty()) {
++            Toast.makeText(this, "All tools are disabled — open Customise toolbar", Toast.LENGTH_LONG).show()
++            showFollowupToolbarCustomiser()
++            return
++        }
++        val titles = visible.map { it.title }.toTypedArray()
++        MaterialAlertDialogBuilder(this)
++            .setTitle(R.string.followup_menu_title)
++            .setItems(titles) { _, which -> visible[which].run() }
++            .setNeutralButton(R.string.followup_custom_toolbar_title) { _, _ -> showFollowupToolbarCustomiser() }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    private fun setupFollowup() {
++        try {
++            binding.welcomeRecentBtn.setOnClickListener { showFollowupRecent() }
++        } catch (e: Exception) {
++        }
++        renderFollowupToolbar()
++
++        // (21) Tour: sirf pehli baar, editor khulne ke thodi der baad.
++        if (!FollowupStore.isTourShown(this)) {
++            binding.root.postDelayed({ showFollowupTour(force = false) }, 800)
++        }
++
++        // (9a) Drawer file list me swipe: left = next file tab, right = previous.
++        val swipeHelper = ItemTouchHelper(
++            object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
++                override fun onMove(
++                    recyclerView: RecyclerView,
++                    viewHolder: RecyclerView.ViewHolder,
++                    target: RecyclerView.ViewHolder
++                ): Boolean = false
++
++                override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
++                    submitDrawerList(folderBackStack.isNotEmpty())
++                    if (openTabs.isEmpty()) return
++                    val next = if (direction == ItemTouchHelper.LEFT) {
++                        (activeTabIndex + 1) % openTabs.size
++                    } else {
++                        (activeTabIndex - 1 + openTabs.size) % openTabs.size
++                    }
++                    switchTab(next)
++                }
++            }
++        )
++        try {
++            swipeHelper.attachToRecyclerView(binding.fileRecyclerView)
++        } catch (e: Exception) {
++        }
++
++        // (9b) Editor gestures + (5) hex tap: fling = line delete (confirm +
++        // Snackbar undo), tap on #RRGGBB = hex picker. Listener kabhi event
++        // consume nahi karta, isliye normal typing/selection chalta rehta hai.
++        val density = resources.displayMetrics.density
++        var downX = 0f
++        var downY = 0f
++        var downTime = 0L
++        binding.editor.setOnTouchListener { _, event ->
++            when (event.actionMasked) {
++                MotionEvent.ACTION_DOWN -> {
++                    downX = event.x
++                    downY = event.y
++                    downTime = System.currentTimeMillis()
++                }
++                MotionEvent.ACTION_UP -> {
++                    val dx = event.x - downX
++                    val dy = event.y - downY
++                    val dt = System.currentTimeMillis() - downTime
++                    val ed = binding.editor
++                    if (dt < 600 && kotlin.math.abs(dx) > 160 * density &&
++                        kotlin.math.abs(dy) < 60 * density
++                    ) {
++                        showFollowupDeleteLineConfirm(downX, downY)
++                    } else if (dt < 500 && kotlin.math.abs(dx) < 24 &&
++                        kotlin.math.abs(dy) < 24
++                    ) {
++                        try {
++                            val offset = ed.getOffsetForPosition(downX, downY)
++                            val text = ed.text
++                            if (text != null && offset in 0..text.length) {
++                                val found = FollowupHex.findAt(text, offset)
++                                if (found != null) showFollowupHexPicker(found)
++                            }
++                        } catch (e: Exception) {
++                        }
++                    }
++                }
++            }
++            false
++        }
++
++        // (18) Lint: har edit ke 500 ms baad, background thread par compute.
++        binding.editor.addTextChangedListener(object : TextWatcher {
++            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
++            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
++                scheduleFollowupLint()
++            }
++            override fun afterTextChanged(s: Editable?) {}
++        })
++    }
++
++    private fun showFollowupDeleteLineConfirm(x: Float, y: Float) {
++        val ed = binding.editor
++        val text = ed.text ?: return
++        val offset = try {
++            ed.getOffsetForPosition(x, y).coerceIn(0, text.length)
++        } catch (e: Exception) {
++            return
++        }
++        val full = text.toString()
++        val lineStart = full.lastIndexOf('\n', (offset - 1).coerceAtLeast(0)).let {
++            if (it < 0) 0 else it + 1
++        }
++        var lineEnd = full.indexOf('\n', offset)
++        if (lineEnd < 0) lineEnd = full.length else lineEnd += 1
++        if (lineStart >= lineEnd) return
++        val deleted = full.substring(lineStart, lineEnd)
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Delete line?")
++            .setMessage(deleted.trim().take(120))
++            .setPositiveButton("Delete") { _, _ ->
++                ed.text?.delete(lineStart, lineEnd)
++                Snackbar.make(binding.root, "Line deleted", Snackbar.LENGTH_LONG)
++                    .setAction("Undo") {
++                        ed.text?.insert(lineStart, deleted)
++                        ed.setSelection((lineStart + deleted.length).coerceAtMost(ed.length()))
++                    }
++                    .show()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    private fun scheduleFollowupLint() {
++        followupLintRunnable?.let { followupLintHandler.removeCallbacks(it) }
++        val snapshot = binding.editor.text?.toString() ?: return
++        val ext = currentFileExtension()
++        val runnable = Runnable {
++            lifecycleScope.launch(Dispatchers.Default) {
++                val issues = FollowupLint.lint(snapshot, ext)
++                withContext(Dispatchers.Main) {
++                    followupLintIssues = issues
++                    applyFollowupLintSpans()
++                }
++            }
++        }
++        followupLintRunnable = runnable
++        followupLintHandler.postDelayed(runnable, 500)
++    }
++
++    private fun applyFollowupLintSpans() {
++        val editable = binding.editor.text ?: return
++        for (span in followupLintSpans) {
++            try {
++                editable.removeSpan(span)
++            } catch (e: Exception) {
++            }
++        }
++        followupLintSpans.clear()
++        if (followupLintIssues.isEmpty()) return
++        val full = editable.toString()
++        val lineStarts = ArrayList<Int>()
++        lineStarts.add(0)
++        for (i in full.indices) {
++            if (full[i] == '\n') lineStarts.add(i + 1)
++        }
++        for (issue in followupLintIssues.take(50)) {
++            val idx = issue.line - 1
++            if (idx !in lineStarts.indices) continue
++            val start = lineStarts[idx]
++            var end = if (idx + 1 < lineStarts.size) lineStarts[idx + 1] - 1 else full.length
++            if (end <= start) continue
++            val span = android.text.style.UnderlineSpan()
++            try {
++                editable.setSpan(span, start, end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++                followupLintSpans.add(span)
++            } catch (e: Exception) {
++            }
++        }
++    }
++
++    private fun showFollowupLintDialog() {
++        if (followupLintIssues.isEmpty()) {
++            MaterialAlertDialogBuilder(this)
++                .setTitle("Offline lint")
++                .setMessage("No lint issues found in this file.")
++                .setPositiveButton(android.R.string.ok, null)
++                .show()
++            return
++        }
++        val items = followupLintIssues.map { "Ln ${it.line}: ${it.message}" }.toTypedArray()
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Offline lint (${followupLintIssues.size} issues)")
++            .setItems(items) { dialog, which ->
++                val line = followupLintIssues[which].line
++                binding.editor.gotoLine(line)
++                dialog.dismiss()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (2) Large file fast mode: badi file par highlight buffer tight hota
++    // hai (sirf visible range + 40 lines), chhoti par wapas 120 lines.
++    private fun applyFollowupFastMode(tab: EditorTab) {
++        val lines = if (tab.content.isEmpty()) 1 else tab.content.count { it == '\n' } + 1
++        val large = lines > 5000 || tab.content.length > 300000
++        binding.editor.applyFastMode(large)
++        if (large && followupLastFastTabId != tab.id) {
++            followupLastFastTabId = tab.id
++            Toast.makeText(
++                this,
++                "Fast mode on: large file, highlight limited to visible area",
++                Toast.LENGTH_LONG
++            ).show()
++        } else if (!large) {
++            followupLastFastTabId = null
++        }
++    }
++
++    private fun showFollowupFastModeInfo() {
++        val tab = openTabs.getOrNull(activeTabIndex) ?: run {
++            Toast.makeText(this, "No file open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        applyFollowupFastMode(tab)
++        val lines = if (tab.content.isEmpty()) 1 else tab.content.count { it == '\n' } + 1
++        val large = lines > 5000 || tab.content.length > 300000
++        Toast.makeText(
++            this,
++            if (large) "Fast mode on for this file" else "Fast mode off — this file is small",
++            Toast.LENGTH_SHORT
++        ).show()
++    }
++
++    // (17) Custom toolbar row: stored order ke pehle 8 enabled tools.
++    private fun renderFollowupToolbar() {
++        try {
++            val container = binding.followupToolbarContainer
++            container.removeAllViews()
++            val byId = followupAllTools().associateBy { it.id }
++            val disabled = FollowupStore.toolbarDisabled(this)
++            val shown = FollowupStore.toolbarOrder(this)
++                .mapNotNull { byId[it] }
++                .filter { it.id !in disabled }
++                .take(8)
++            binding.followupToolbar.visibility =
++                if (shown.isEmpty()) View.GONE else View.VISIBLE
++            val density = resources.displayMetrics.density
++            for (tool in shown) {
++                val btn = android.widget.Button(this, null, android.R.attr.borderlessButtonStyle).apply {
++                    text = tool.title
++                    textSize = 13f
++                    setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
++                }
++                btn.setOnClickListener { tool.run() }
++                container.addView(
++                    btn,
++                    LinearLayout.LayoutParams(
++                        LinearLayout.LayoutParams.WRAP_CONTENT,
++                        LinearLayout.LayoutParams.MATCH_PARENT
++                    )
++                )
++            }
++        } catch (e: Exception) {
++        }
++    }
++
++    private inner class FollowupToolbarViewHolder(
++        val row: LinearLayout,
++        val titleView: TextView,
++        val upBtn: android.widget.Button,
++        val downBtn: android.widget.Button,
++        val toggle: android.widget.Switch
++    ) : RecyclerView.ViewHolder(row)
++
++    private fun showFollowupToolbarCustomiser() {
++        val ids = FollowupStore.toolbarOrder(this).toMutableList()
++        val disabled = FollowupStore.toolbarDisabled(this).toMutableSet()
++        val titles = followupAllTools().associate { it.id to it.title }
++        val col = LinearLayout(this).apply {
++            orientation = LinearLayout.VERTICAL
++            layoutParams = ViewGroup.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
++            )
++        }
++        val list = RecyclerView(this).apply {
++            layoutManager = LinearLayoutManager(this@MainActivity)
++            layoutParams = LinearLayout.LayoutParams(
++                LinearLayout.LayoutParams.MATCH_PARENT, (420 * resources.displayMetrics.density).toInt()
++            )
++        }
++        col.addView(list)
++        val adapter = object : RecyclerView.Adapter<FollowupToolbarViewHolder>() {
++            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FollowupToolbarViewHolder {
++                val row = LinearLayout(this@MainActivity).apply {
++                    orientation = LinearLayout.HORIZONTAL
++                    gravity = android.view.Gravity.CENTER_VERTICAL
++                }
++                val titleView = TextView(this@MainActivity).apply {
++                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
++                    textSize = 15f
++                }
++                val upBtn = android.widget.Button(this@MainActivity).apply { text = "↑" }
++                val downBtn = android.widget.Button(this@MainActivity).apply { text = "↓" }
++                val toggle = android.widget.Switch(this@MainActivity)
++                row.addView(titleView)
++                row.addView(upBtn)
++                row.addView(downBtn)
++                row.addView(toggle)
++                return FollowupToolbarViewHolder(row, titleView, upBtn, downBtn, toggle)
++            }
++
++            override fun getItemCount(): Int = ids.size
++
++            override fun onBindViewHolder(holder: FollowupToolbarViewHolder, position: Int) {
++                val id = ids[position]
++                holder.titleView.text = titles[id] ?: id
++                holder.toggle.setOnCheckedChangeListener(null)
++                holder.toggle.isChecked = id !in disabled
++                holder.toggle.setOnCheckedChangeListener { _, checked ->
++                    if (checked) disabled.remove(id) else disabled.add(id)
++                    FollowupStore.setToolbarDisabled(this@MainActivity, disabled)
++                    renderFollowupToolbar()
++                }
++                holder.upBtn.setOnClickListener {
++                    if (position > 0) {
++                        val moved = ids.removeAt(position)
++                        ids.add(position - 1, moved)
++                        FollowupStore.setToolbarOrder(this@MainActivity, ids)
++                        notifyDataSetChanged()
++                        renderFollowupToolbar()
++                    }
++                }
++                holder.downBtn.setOnClickListener {
++                    if (position < ids.size - 1) {
++                        val moved = ids.removeAt(position)
++                        ids.add(position + 1, moved)
++                        FollowupStore.setToolbarOrder(this@MainActivity, ids)
++                        notifyDataSetChanged()
++                        renderFollowupToolbar()
++                    }
++                }
++            }
++        }
++        list.adapter = adapter
++        MaterialAlertDialogBuilder(this)
++            .setTitle(R.string.followup_custom_toolbar_title)
++            .setView(col)
++            .setPositiveButton("Done") { _, _ ->
++                FollowupStore.setToolbarOrder(this, ids)
++                FollowupStore.setToolbarDisabled(this, disabled)
++                renderFollowupToolbar()
++            }
++            .show()
++    }
++
++    // (1) Quick file switcher: current folder ke saare files (max 500,
++    // background thread par walk), fuzzy type-ahead filter (200 ms
++    // debounce), tap par file khulti hai. Folder na ho to khule tabs.
++    private fun showFollowupQuickSwitcher() {
++        val col = LinearLayout(this).apply {
++            orientation = LinearLayout.VERTICAL
++            setPadding(32, 24, 32, 8)
++        }
++        val search = EditText(this).apply {
++            hint = "Type to filter files…"
++        }
++        val listView = android.widget.ListView(this)
++        col.addView(search)
++        col.addView(
++            listView,
++            LinearLayout.LayoutParams(
++                LinearLayout.LayoutParams.MATCH_PARENT,
++                (420 * resources.displayMetrics.density).toInt()
++            )
++        )
++        val dialog = MaterialAlertDialogBuilder(this)
++            .setTitle("Quick file switcher")
++            .setView(col)
++            .setNegativeButton(android.R.string.cancel, null)
++            .create()
++        data class QItem(val name: String, val relPath: String, val doc: DocumentFile)
++        val full = ArrayList<QItem>()
++        val shown = ArrayList<QItem>()
++        val display = ArrayList<String>()
++        val adapter = android.widget.ArrayAdapter(
++            this, android.R.layout.simple_list_item_1, display
++        )
++        listView.adapter = adapter
++        fun refresh(query: String) {
++            shown.clear()
++            display.clear()
++            val filtered = if (query.isBlank()) {
++                full.take(100)
++            } else {
++                full.mapNotNull { item ->
++                    val score = FollowupFuzzy.scoreFile(query, item.name, item.relPath)
++                    if (score < 0) null else item to score
++                }.sortedByDescending { it.second }.map { it.first }.take(50)
++            }
++            shown.addAll(filtered)
++            display.addAll(filtered.map { "${it.name} — ${it.relPath}" })
++            adapter.notifyDataSetChanged()
++        }
++        listView.setOnItemClickListener { _, _, position, _ ->
++            if (position in shown.indices) {
++                dialog.dismiss()
++                openFileInTab(shown[position].doc)
++            }
++        }
++        val filterHandler = Handler(Looper.getMainLooper())
++        var filterRunnable: Runnable? = null
++        search.addTextChangedListener(object : TextWatcher {
++            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
++            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
++                filterRunnable?.let { filterHandler.removeCallbacks(it) }
++                val q = s?.toString() ?: ""
++                val r = Runnable { refresh(q) }
++                filterRunnable = r
++                filterHandler.postDelayed(r, 200)
++            }
++            override fun afterTextChanged(s: Editable?) {}
++        })
++        dialog.show()
++        search.requestFocus()
++        lifecycleScope.launch {
++            val items = withContext(Dispatchers.IO) {
++                val out = ArrayList<QItem>()
++                val folder = currentFolder
++                if (folder != null) {
++                    fun walk(dir: DocumentFile, prefix: String, depth: Int) {
++                        if (out.size >= 500 || depth > 4) return
++                        val children = try {
++                            dir.listFiles()
++                        } catch (e: Exception) {
++                            return
++                        }
++                        for (child in children) {
++                            if (out.size >= 500) return
++                            val name = child.name ?: continue
++                            if (prefs.hideHiddenFiles && name.startsWith(".")) continue
++                            try {
++                                if (child.isDirectory) {
++                                    walk(child, "$prefix$name/", depth + 1)
++                                } else if (child.isFile) {
++                                    out.add(QItem(name, "$prefix$name", child))
++                                }
++                            } catch (e: Exception) {
++                            }
++                        }
++                    }
++                    try {
++                        walk(folder, "", 0)
++                    } catch (e: Exception) {
++                    }
++                }
++                if (out.isEmpty()) {
++                    for (tab in openTabs) {
++                        val uri = tab.uri ?: continue
++                        try {
++                            val doc = DocumentFile.fromSingleUri(this@MainActivity, uri)
++                            if (doc != null && doc.isFile) {
++                                out.add(QItem(tab.name, tab.name, doc))
++                            }
++                        } catch (e: Exception) {
++                        }
++                    }
++                }
++                out
++            }
++            full.clear()
++            full.addAll(items)
++            refresh(search.text?.toString() ?: "")
++        }
++    }
++
++    // (4) Recent files: har tab switch par persist hoti list, ek tap par wapas.
++    private fun showFollowupRecent() {
++        val items = FollowupStore.recentFiles(this)
++        if (items.isEmpty()) {
++            Toast.makeText(this, "No recent files yet", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val labels = items.map { "${it.name} — ${relativeTimeAgo(it.time)}" }.toTypedArray()
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Recent files")
++            .setItems(labels) { dialog, which ->
++                val uri = try {
++                    android.net.Uri.parse(items[which].uri)
++                } catch (e: Exception) {
++                    null
++                }
++                if (uri != null) {
++                    openFileFromUri(uri)
++                }
++                dialog.dismiss()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (5) Hex color picker: caret par #RRGGBB ho to preview + presets +
++    // custom hex; Apply par document me hex replace hota hai.
++    private fun showFollowupHexPicker(foundIn: FollowupHex.Found? = null) {
++        val ed = binding.editor
++        val text = ed.text ?: return
++        val found = foundIn ?: run {
++            val offset = ed.selectionStart.coerceIn(0, text.length)
++            FollowupHex.findAt(text, offset)
++        }
++        if (found == null) {
++            Toast.makeText(this, "No #RRGGBB color at caret", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val col = LinearLayout(this).apply {
++            orientation = LinearLayout.VERTICAL
++            setPadding(32, 24, 32, 8)
++        }
++        val preview = View(this).apply {
++            layoutParams = LinearLayout.LayoutParams(
++                LinearLayout.LayoutParams.MATCH_PARENT,
++                (48 * resources.displayMetrics.density).toInt()
++            )
++            try {
++                setBackgroundColor(android.graphics.Color.parseColor(found.hex))
++            } catch (e: Exception) {
++            }
++        }
++        val input = EditText(this).apply {
++            setText(found.hex)
++            hint = "#RRGGBB"
++        }
++        col.addView(preview)
++        col.addView(input)
++        for (preset in FollowupHex.presets) {
++            val btn = android.widget.Button(this, null, android.R.attr.borderlessButtonStyle).apply {
++                this.text = preset
++                try {
++                    setBackgroundColor(android.graphics.Color.parseColor(preset))
++                    setTextColor(android.graphics.Color.WHITE)
++                } catch (e: Exception) {
++                }
++            }
++            btn.setOnClickListener {
++                input.setText(preset)
++                try {
++                    preview.setBackgroundColor(android.graphics.Color.parseColor(preset))
++                } catch (e: Exception) {
++                }
++            }
++            col.addView(btn)
++        }
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Hex color picker")
++            .setView(col)
++            .setPositiveButton("Apply") { _, _ ->
++                val hex = FollowupHex.normalize(input.text.toString())
++                if (!FollowupHex.isValid(hex)) {
++                    Toast.makeText(this, "Invalid hex color", Toast.LENGTH_SHORT).show()
++                    return@setPositiveButton
++                }
++                val editable = binding.editor.text ?: return@setPositiveButton
++                val start = found.start.coerceIn(0, editable.length)
++                val end = found.end.coerceIn(start, editable.length)
++                editable.replace(start, end, hex)
++                binding.editor.setSelection((start + hex.length).coerceAtMost(editable.length))
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (6) File templates: template chuno, sahi extension wali nayi file khulti hai.
++    private fun showFollowupTemplates() {
++        val templates = FollowupTemplates.all
++        val labels = templates.map { "${it.label} (${it.fileName})" }.toTypedArray()
++        MaterialAlertDialogBuilder(this)
++            .setTitle("New file from template")
++            .setItems(labels) { dialog, which ->
++                openTemplateTab(templates[which].fileName, templates[which].content)
++                dialog.dismiss()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    private fun openTemplateTab(name: String, content: String) {
++        val newTab = EditorTab(name = name, content = content, diskContent = "", isModified = true)
++        openTabs.add(newTab)
++        switchTab(openTabs.size - 1)
++        saveSessionState()
++    }
++
++    // (7) Image path preview: caret wali line ka image path resolve karke
++    // background thread par decode, fail par graceful message.
++    private fun showFollowupImagePreview() {
++        val ed = binding.editor
++        val text = ed.text?.toString() ?: return
++        val offset = ed.selectionStart.coerceIn(0, text.length)
++        val lineStart = text.lastIndexOf('\n', (offset - 1).coerceAtLeast(0)).let {
++            if (it < 0) 0 else it + 1
++        }
++        val lineEnd = text.indexOf('\n', offset).let { if (it < 0) text.length else it }
++        val line = text.substring(lineStart, lineEnd)
++        val match = Regex("([A-Za-z0-9_./-]+\\.(png|jpg|jpeg|gif|webp|bmp))")
++            .find(line)
++        if (match == null) {
++            Toast.makeText(this, "No image path on this line", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val path = match.groupValues[1]
++        lifecycleScope.launch {
++            val doc = withContext(Dispatchers.IO) {
++                try {
++                    if (path.startsWith("/")) {
++                        val file = java.io.File(path)
++                        if (file.isFile) DocumentFile.fromFile(file) else null
++                    } else {
++                        var found: DocumentFile? = null
++                        for (base in listOfNotNull(currentFolder, rootDocumentFile)) {
++                            found = findDocumentByRelativePath(base, path)
++                            if (found != null) break
++                        }
++                        found
++                    }
++                } catch (e: Exception) {
++                    null
++                }
++            }
++            if (doc == null) {
++                Toast.makeText(this@MainActivity, "Image not found: $path", Toast.LENGTH_LONG).show()
++                return@launch
++            }
++            val bitmap = withContext(Dispatchers.IO) {
++                try {
++                    if (doc.length() > 8 * 1024 * 1024) return@withContext null
++                    contentResolver.openInputStream(doc.uri)?.use {
++                        android.graphics.BitmapFactory.decodeStream(it)
++                    }
++                } catch (e: Exception) {
++                    null
++                }
++            }
++            if (bitmap == null) {
++                Toast.makeText(this@MainActivity, "Could not load image: $path", Toast.LENGTH_LONG).show()
++                return@launch
++            }
++            val iv = android.widget.ImageView(this@MainActivity).apply {
++                setImageBitmap(bitmap)
++                adjustViewBounds = true
++            }
++            val sv = android.widget.HorizontalScrollView(this@MainActivity).apply {
++                addView(android.widget.ScrollView(this@MainActivity).apply { addView(iv) })
++            }
++            MaterialAlertDialogBuilder(this@MainActivity)
++                .setTitle(doc.name ?: path)
++                .setView(sv)
++                .setPositiveButton("Close", null)
++                .show()
++        }
++    }
++
++    // (10) File browser sort + filter. Date/size ke liye DocumentFile se
++    // metadata liya jata hai (FileItem me wo fields nahi hain); choice
++    // persist hoti hai aur name/type sort agle folder load par bhi lagta hai.
++    private fun showFollowupSortFilter() {
++        val sortOptions = arrayOf("Name", "Date", "Size", "Type")
++        val sortKeys = arrayOf("name", "date", "size", "type")
++        val sortChecked = sortKeys.indexOf(FollowupStore.browserSort(this)).coerceAtLeast(0)
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Sort files by")
++            .setSingleChoiceItems(sortOptions, sortChecked) { _, _ -> }
++            .setPositiveButton("Next") { dialog, _ ->
++                val listView = (dialog as AlertDialog).listView
++                val sortPos = listView.checkedItemPosition.coerceAtLeast(0)
++                val sortKey = sortKeys[sortPos]
++                showFollowupTypeFilter(sortKey)
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    private fun showFollowupTypeFilter(sortKey: String) {
++        val filterOptions = arrayOf("All files", "Code", "Images", "Documents", "Other")
++        val filterKeys = arrayOf("all", "code", "image", "doc", "other")
++        val filterChecked = filterKeys.indexOf(FollowupStore.browserTypeFilter(this)).coerceAtLeast(0)
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Show only")
++            .setSingleChoiceItems(filterOptions, filterChecked) { _, _ -> }
++            .setPositiveButton("Apply") { dialog, _ ->
++                val listView = (dialog as AlertDialog).listView
++                val filterPos = listView.checkedItemPosition.coerceAtLeast(0)
++                val filterKey = filterKeys[filterPos]
++                FollowupStore.setBrowserSort(this, sortKey)
++                FollowupStore.setBrowserTypeFilter(this, filterKey)
++                applyFollowupBrowserSortFilterNow(sortKey, filterKey)
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    private fun applyFollowupBrowserSortFilterNow(sortKey: String, filterKey: String) {
++        val folder = currentFolder ?: run {
++            Toast.makeText(this, "No folder open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        lifecycleScope.launch {
++            val sorted = withContext(Dispatchers.IO) {
++                val children = try {
++                    folder.listFiles()
++                } catch (e: Exception) {
++                    emptyArray()
++                }
++                val dirs = ArrayList<DocumentFile>()
++                val files = ArrayList<Triple<DocumentFile, Long, Long>>()
++                for (child in children) {
++                    val name = child.name ?: continue
++                    if (prefs.hideHiddenFiles && name.startsWith(".")) continue
++                    try {
++                        if (child.isDirectory) {
++                            dirs.add(child)
++                        } else if (child.isFile) {
++                            if (filterKey != "all" && FollowupStore.typeGroup(name) != filterKey) continue
++                            files.add(Triple(child, child.lastModified(), child.length()))
++                        }
++                    } catch (e: Exception) {
++                    }
++                }
++                val sortedDirs = dirs.sortedBy { it.name?.lowercase() ?: "" }
++                val sortedFiles = when (sortKey) {
++                    "date" -> files.sortedByDescending { it.second }
++                    "size" -> files.sortedByDescending { it.third }
++                    "type" -> files.sortedWith(
++                        compareBy(
++                            { it.first.name?.substringAfterLast('.', "")?.lowercase() ?: "" },
++                            { it.first.name?.lowercase() ?: "" }
++                        )
++                    )
++                    else -> files.sortedBy { it.first.name?.lowercase() ?: "" }
++                }
++                val items = ArrayList<FileItem>()
++                for (dir in sortedDirs) {
++                    items.add(FileItem(dir.name ?: "", dir.uri, isDirectory = true))
++                }
++                for ((doc, _, _) in sortedFiles) {
++                    items.add(FileItem(doc.name ?: "", doc.uri, isDirectory = false))
++                }
++                items
++            }
++            lastDrawerBase = filterHiddenFiles(sorted)
++            submitDrawerList(folderBackStack.isNotEmpty())
++            Toast.makeText(this@MainActivity, "Browser sorted", Toast.LENGTH_SHORT).show()
++        }
++    }
++
++    private fun applyFollowupBrowserSortFilter(items: List<FileItem>): List<FileItem> {
++        val filterKey = FollowupStore.browserTypeFilter(this)
++        val sortKey = FollowupStore.browserSort(this)
++        val filtered = if (filterKey == "all") {
++            items
++        } else {
++            items.filter { it.isDirectory || FollowupStore.typeGroup(it.name) == filterKey }
++        }
++        return when (sortKey) {
++            "name" -> filtered.sortedWith(
++                compareByDescending<FileItem> { it.isDirectory }.thenBy { it.name.lowercase() }
++            )
++            "type" -> filtered.sortedWith(
++                compareByDescending<FileItem> { it.isDirectory }
++                    .thenBy { it.name.substringAfterLast('.', "").lowercase() }
++                    .thenBy { it.name.lowercase() }
++            )
++            else -> filtered
++        }
++    }
++
++    // (11) Workspaces: kai folders, ek tap me switch; list persist hoti hai.
++    private fun showFollowupWorkspaces() {
++        val spaces = FollowupStore.workspaces(this)
++        val labels = spaces.map { it.name }.toMutableList()
++        labels.add("Add current folder as workspace")
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Workspaces")
++            .setItems(labels.toTypedArray()) { dialog, which ->
++                if (which == spaces.size) {
++                    val folder = currentFolder ?: run {
++                        Toast.makeText(this, "No folder open", Toast.LENGTH_SHORT).show()
++                        return@setItems
++                    }
++                    val input = EditText(this).apply {
++                        setText(folder.name ?: "Workspace")
++                    }
++                    MaterialAlertDialogBuilder(this)
++                        .setTitle("Workspace name")
++                        .setView(input)
++                        .setPositiveButton("Add") { _, _ ->
++                            val name = input.text.toString().trim()
++                            if (name.isNotEmpty()) {
++                                FollowupStore.addWorkspace(this, name, folder.uri.toString())
++                                Toast.makeText(this, "Workspace added: $name", Toast.LENGTH_SHORT).show()
++                            }
++                        }
++                        .setNegativeButton(android.R.string.cancel, null)
++                        .show()
++                } else {
++                    val space = spaces[which]
++                    val doc = try {
++                        DocumentFile.fromTreeUri(this, android.net.Uri.parse(space.uri))
++                    } catch (e: Exception) {
++                        null
++                    }
++                    if (doc == null || !doc.exists()) {
++                        Toast.makeText(this, "Workspace folder not found", Toast.LENGTH_LONG).show()
++                        return@setItems
++                    }
++                    rootDocumentFile = doc
++                    currentFolder = doc
++                    folderBackStack.clear()
++                    folderCache.evictAll()
++                    loadCurrentFolderContentsFast()
++                    Toast.makeText(this, "Workspace: ${space.name}", Toast.LENGTH_SHORT).show()
++                }
++                dialog.dismiss()
++            }
++            .setNeutralButton("Remove workspace…") { _, _ ->
++                if (spaces.isEmpty()) {
++                    Toast.makeText(this, "No workspaces saved", Toast.LENGTH_SHORT).show()
++                    return@setNeutralButton
++                }
++                val names = spaces.map { it.name }.toTypedArray()
++                MaterialAlertDialogBuilder(this)
++                    .setTitle("Remove workspace")
++                    .setItems(names) { _, which ->
++                        FollowupStore.removeWorkspace(this, spaces[which].uri)
++                        Toast.makeText(this, "Workspace removed", Toast.LENGTH_SHORT).show()
++                    }
++                    .setNegativeButton(android.R.string.cancel, null)
++                    .show()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (12) Offline cheat sheets: bundled text, koi network nahi.
++    private fun showFollowupCheatSheets() {
++        val languages = FollowupCheatSheets.languages()
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Cheat sheets (offline)")
++            .setItems(languages.toTypedArray()) { _, which ->
++                val lang = languages[which]
++                val textView = TextView(this).apply {
++                    text = FollowupCheatSheets.sheets[lang] ?: ""
++                    typeface = android.graphics.Typeface.MONOSPACE
++                    textSize = 13f
++                    setPadding(32, 24, 32, 24)
++                }
++                val scroll = android.widget.ScrollView(this).apply { addView(textView) }
++                MaterialAlertDialogBuilder(this)
++                    .setTitle("$lang cheat sheet")
++                    .setView(scroll)
++                    .setPositiveButton("Close", null)
++                    .show()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (13) File compare: pehle background thread par diff count nikalta
++    // hai, phir existing CompareActivity side-by-side diff dikhata hai.
++    // Disk wali files compare hoti hain (CompareActivity bhi disk se padhta hai).
++    private fun showFollowupDiffPicker() {
++        val current = openTabs.getOrNull(activeTabIndex) ?: run {
++            Toast.makeText(this, "No file open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val currentUri = current.uri?.toString() ?: run {
++            Toast.makeText(this, "Save the current file first", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val candidates = LinkedHashMap<String, String>()
++        for ((i, tab) in openTabs.withIndex()) {
++            if (i == activeTabIndex) continue
++            val u = tab.uri?.toString() ?: continue
++            candidates[u] = tab.name
++        }
++        try {
++            for (item in lastDrawerBase) {
++                if (item.isDirectory || item.isParent) continue
++                val u = item.uri.toString()
++                if (u != currentUri) candidates.putIfAbsent(u, item.name)
++            }
++        } catch (e: Exception) {
++        }
++        if (candidates.isEmpty()) {
++            Toast.makeText(this, "Open a second file first", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val uris = candidates.keys.toList()
++        val names = candidates.values.toTypedArray()
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Compare with")
++            .setItems(names) { dialog, which ->
++                val otherUri = uris[which]
++                val otherName = names[which]
++                lifecycleScope.launch {
++                    val result = withContext(Dispatchers.Default) {
++                        try {
++                            val linesA = contentResolver.openInputStream(
++                                android.net.Uri.parse(currentUri)
++                            )?.bufferedReader()?.readLines() ?: emptyList()
++                            val linesB = contentResolver.openInputStream(
++                                android.net.Uri.parse(otherUri)
++                            )?.bufferedReader()?.readLines() ?: emptyList()
++                            FollowupDiff.diff(linesA, linesB)
++                        } catch (e: Exception) {
++                            null
++                        }
++                    }
++                    if (result == null) {
++                        Toast.makeText(this@MainActivity, "Could not read one of the files", Toast.LENGTH_SHORT).show()
++                        return@launch
++                    }
++                    val message = if (result.tooLarge) {
++                        "Files are too large for line highlights — open plain side-by-side view?"
++                    } else if (result.differingLines == 0) {
++                        "Files are identical. Open diff view anyway?"
++                    } else {
++                        "${result.differingLines} differing line(s). Open diff view?"
++                    }
++                    MaterialAlertDialogBuilder(this@MainActivity)
++                        .setTitle("Diff preview")
++                        .setMessage(message)
++                        .setPositiveButton("Open diff") { _, _ ->
++                            val intent = Intent(
++                                this@MainActivity,
++                                com.nobidev.nobicode.compare.CompareActivity::class.java
++                            )
++                            intent.putExtra("compare_a_uri", currentUri)
++                            intent.putExtra("compare_a_name", current.name)
++                            intent.putExtra("compare_b_uri", otherUri)
++                            intent.putExtra("compare_b_name", otherName)
++                            startActivity(intent)
++                        }
++                        .setNegativeButton(android.R.string.cancel, null)
++                        .show()
++                }
++                dialog.dismiss()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (14) In-file find & replace with preview: regex support, matches ki
++    // list (line + snippet), Replace one / Replace all. Replacement literal
++    // hai (regex group expansion nahi), matches cap 200.
++    private fun showFollowupFindReplacePreview() {
++        data class FMatch(val line: Int, val start: Int, val end: Int, val snippet: String)
++        val col = LinearLayout(this).apply {
++            orientation = LinearLayout.VERTICAL
++            setPadding(32, 24, 32, 8)
++        }
++        val patternInput = EditText(this).apply { hint = "Search pattern" }
++        val replaceInput = EditText(this).apply { hint = "Replacement" }
++        val regexBox = android.widget.CheckBox(this).apply { text = "Use regex" }
++        val caseBox = android.widget.CheckBox(this).apply { text = "Case sensitive" }
++        val countView = TextView(this).apply { text = "No matches yet" }
++        val listView = android.widget.ListView(this)
++        val findBtn = android.widget.Button(this).apply { text = "Find matches" }
++        val replaceOneBtn = android.widget.Button(this).apply { text = "Replace one" }
++        val replaceAllBtn = android.widget.Button(this).apply { text = "Replace all" }
++        col.addView(patternInput)
++        col.addView(replaceInput)
++        col.addView(regexBox)
++        col.addView(caseBox)
++        col.addView(findBtn)
++        col.addView(countView)
++        col.addView(
++            listView,
++            LinearLayout.LayoutParams(
++                LinearLayout.LayoutParams.MATCH_PARENT,
++                (300 * resources.displayMetrics.density).toInt()
++            )
++        )
++        col.addView(replaceOneBtn)
++        col.addView(replaceAllBtn)
++        val dialog = MaterialAlertDialogBuilder(this)
++            .setTitle("Find & replace with preview")
++            .setView(col)
++            .setNegativeButton("Close", null)
++            .create()
++        var matches = listOf<FMatch>()
++        var matchIndex = 0
++        val display = ArrayList<String>()
++        val adapter = android.widget.ArrayAdapter(
++            this, android.R.layout.simple_list_item_1, display
++        )
++        listView.adapter = adapter
++        fun refreshList() {
++            display.clear()
++            display.addAll(matches.map { "Ln ${it.line}: ${it.snippet}" })
++            adapter.notifyDataSetChanged()
++            countView.text = if (matches.isEmpty()) "No matches" else "${matches.size} match(es)"
++        }
++        findBtn.setOnClickListener {
++            val pattern = patternInput.text.toString()
++            if (pattern.isEmpty()) {
++                Toast.makeText(this, "Enter a search pattern", Toast.LENGTH_SHORT).show()
++                return@setOnClickListener
++            }
++            val snapshot = binding.editor.text?.toString() ?: ""
++            val useRegex = regexBox.isChecked
++            val caseSensitive = caseBox.isChecked
++            lifecycleScope.launch(Dispatchers.Default) {
++                val found = ArrayList<FMatch>()
++                try {
++                    val regex = if (useRegex) {
++                        if (caseSensitive) Regex(pattern) else Regex(pattern, RegexOption.IGNORE_CASE)
++                    } else {
++                        val escaped = Regex.escape(pattern)
++                        if (caseSensitive) Regex(escaped) else Regex(escaped, RegexOption.IGNORE_CASE)
++                    }
++                    val lineStarts = ArrayList<Int>()
++                    lineStarts.add(0)
++                    for (i in snapshot.indices) {
++                        if (snapshot[i] == '\n') lineStarts.add(i + 1)
++                    }
++                    fun lineOf(offset: Int): Int {
++                        var lo = 0
++                        var hi = lineStarts.size - 1
++                        while (lo < hi) {
++                            val mid = (lo + hi + 1) / 2
++                            if (lineStarts[mid] <= offset) lo = mid else hi = mid - 1
++                        }
++                        return lo + 1
++                    }
++                    for (m in regex.findAll(snapshot)) {
++                        if (found.size >= 200) break
++                        val line = lineOf(m.range.first)
++                        val ls = lineStarts[line - 1]
++                        var le = snapshot.indexOf('\n', m.range.first)
++                        if (le < 0) le = snapshot.length
++                        found.add(
++                            FMatch(line, m.range.first, m.range.last + 1, snapshot.substring(ls, le).trim().take(100))
++                        )
++                    }
++                } catch (e: Exception) {
++                    withContext(Dispatchers.Main) {
++                        Toast.makeText(this@MainActivity, "Invalid pattern", Toast.LENGTH_SHORT).show()
++                    }
++                    return@launch
++                }
++                withContext(Dispatchers.Main) {
++                    matches = found
++                    matchIndex = 0
++                    refreshList()
++                }
++            }
++        }
++        listView.setOnItemClickListener { _, _, position, _ ->
++            if (position in matches.indices) {
++                matchIndex = position
++                binding.editor.gotoLine(matches[position].line)
++            }
++        }
++        replaceOneBtn.setOnClickListener {
++            if (matches.isEmpty()) {
++                Toast.makeText(this, "Tap Find matches first", Toast.LENGTH_SHORT).show()
++                return@setOnClickListener
++            }
++            val replacement = replaceInput.text.toString()
++            val match = matches[matchIndex % matches.size]
++            val editable = binding.editor.text ?: return@setOnClickListener
++            if (match.start in 0..editable.length && match.end in match.start..editable.length) {
++                editable.replace(match.start, match.end, replacement)
++                binding.editor.setSelection((match.start + replacement.length).coerceAtMost(editable.length))
++                matches = emptyList()
++                refreshList()
++                Toast.makeText(this, "Replaced one — tap Find again to refresh", Toast.LENGTH_SHORT).show()
++            }
++        }
++        replaceAllBtn.setOnClickListener {
++            if (matches.isEmpty()) {
++                Toast.makeText(this, "Tap Find matches first", Toast.LENGTH_SHORT).show()
++                return@setOnClickListener
++            }
++            val replacement = replaceInput.text.toString()
++            val editable = binding.editor.text ?: return@setOnClickListener
++            var count = 0
++            for (match in matches.sortedByDescending { it.start }) {
++                if (match.start in 0..editable.length && match.end in match.start..editable.length) {
++                    editable.replace(match.start, match.end, replacement)
++                    count++
++                }
++            }
++            matches = emptyList()
++            refreshList()
++            Toast.makeText(this, "Replaced $count occurrence(s)", Toast.LENGTH_SHORT).show()
++        }
++        dialog.show()
++    }
++
++    // (15) Split editor panes: do saved files, alag activity me side by
++    // side (landscape) / stacked (portrait), dono independently editable.
++    private fun showFollowupSplit() {
++        val current = openTabs.getOrNull(activeTabIndex) ?: run {
++            Toast.makeText(this, "No file open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val currentUri = current.uri?.toString() ?: run {
++            Toast.makeText(this, "Save the current file first", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val candidates = openTabs.filterIndexed { i, tab ->
++            i != activeTabIndex && tab.uri != null
++        }
++        if (candidates.isEmpty()) {
++            Toast.makeText(this, "Open and save a second file first", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val names = candidates.map { it.name }.toTypedArray()
++        MaterialAlertDialogBuilder(this)
++            .setTitle("Split with")
++            .setItems(names) { dialog, which ->
++                val other = candidates[which]
++                val intent = Intent(this, FollowupSplitActivity::class.java)
++                intent.putExtra("split_a_uri", currentUri)
++                intent.putExtra("split_a_name", current.name)
++                intent.putExtra("split_b_uri", other.uri.toString())
++                intent.putExtra("split_b_name", other.name)
++                startActivity(intent)
++                dialog.dismiss()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (3) Editor -> terminal: selection (ya current line) clipboard ke
++    // zariye terminal tak; terminal file ke folder me khulta hai. Is
++    // codebase me terminal session me seedha command bhejne ka koi API
++    // nahi hai, isliye clipboard hi honest bridge hai — fake file channel
++    // ka daava nahi kiya gaya hai.
++    private fun showFollowupSendToTerminal() {
++        val ed = binding.editor
++        val text = ed.text?.toString() ?: return
++        val start = ed.selectionStart.coerceIn(0, text.length)
++        val end = ed.selectionEnd.coerceIn(0, text.length)
++        val toSend = if (start != end) {
++            text.substring(minOf(start, end), maxOf(start, end))
++        } else {
++            val lineStart = text.lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let {
++                if (it < 0) 0 else it + 1
++            }
++            val lineEnd = text.indexOf('\n', start).let { if (it < 0) text.length else it }
++            text.substring(lineStart, lineEnd)
++        }
++        if (toSend.isBlank()) {
++            Toast.makeText(this, "Nothing to send", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
++        clipboard.setPrimaryClip(ClipData.newPlainText("NobiCode", toSend))
++        openTerminalHere()
++        Toast.makeText(this, "Copied to clipboard — paste in terminal", Toast.LENGTH_LONG).show()
++    }
++
++    // (3, reverse) Terminal -> editor: terminal se copy kiya text clipboard
++    // se nayi file ke roop me editor me khulta hai, phir Save As se save hota hai.
++    private fun showFollowupSaveClipboard() {
++        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
++        val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
++        if (clipText.isNullOrBlank()) {
++            Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
++            return
++        }
++        openNewUntitledTab(clipText)
++        Toast.makeText(this, "Clipboard text opened as a new file", Toast.LENGTH_SHORT).show()
++    }
++
++    // (19) Encoding + line ending: choice persist hoti hai, editor text ka
++    // line ending turant badalta hai, aur save/open path usi encoding se
++    // likhta/padhta hai (saveLocalTabContent aur openFileInTab ke hooks dekho).
++    private fun showFollowupEncodingDialog() {
++        val tab = openTabs.getOrNull(activeTabIndex) ?: run {
++            Toast.makeText(this, "No file open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val uriKey = tab.uri?.toString()
++        val encodings = FollowupEncoding.encodings.toTypedArray()
++        val encChecked = encodings.indexOf(FollowupStore.encodingFor(this, uriKey)).coerceAtLeast(0)
++        MaterialAlertDialogBuilder(this)
++            .setTitle("File encoding")
++            .setSingleChoiceItems(encodings, encChecked) { _, _ -> }
++            .setPositiveButton("Next") { dialog, _ ->
++                val listView = (dialog as AlertDialog).listView
++                val encPos = listView.checkedItemPosition.coerceAtLeast(0)
++                val chosenEnc = encodings[encPos]
++                val endings = arrayOf("LF", "CRLF")
++                val leChecked = if (FollowupStore.lineEndingFor(this, uriKey) == "CRLF") 1 else 0
++                MaterialAlertDialogBuilder(this)
++                    .setTitle("Line ending")
++                    .setSingleChoiceItems(endings, leChecked) { _, _ -> }
++                    .setPositiveButton("Apply") { dialog2, _ ->
++                        val listView2 = (dialog2 as AlertDialog).listView
++                        val lePos = listView2.checkedItemPosition.coerceAtLeast(0)
++                        val chosenLe = endings[lePos]
++                        FollowupStore.setEncoding(this, uriKey, chosenEnc)
++                        FollowupStore.setLineEnding(this, uriKey, chosenLe)
++                        val editable = binding.editor.text
++                        if (editable != null) {
++                            val converted = FollowupEncoding.convertLineEndings(
++                                editable.toString(), chosenLe == "CRLF"
++                            )
++                            if (converted != editable.toString()) {
++                                editable.replace(0, editable.length, converted)
++                            }
++                        }
++                        updateEncodingStatus()
++                        Toast.makeText(
++                            this, "Encoding $chosenEnc, $chosenLe — applies on save", Toast.LENGTH_SHORT
++                        ).show()
++                    }
++                    .setNegativeButton(android.R.string.cancel, null)
++                    .show()
++            }
++            .setNegativeButton(android.R.string.cancel, null)
++            .show()
++    }
++
++    // (20) Share file out: saved file ka SAF uri share intent se, untitled
++    // file ka text share intent se.
++    private fun showFollowupShare() {
++        val tab = openTabs.getOrNull(activeTabIndex) ?: run {
++            Toast.makeText(this, "No file open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val intent = Intent(Intent.ACTION_SEND)
++        if (tab.uri != null) {
++            intent.type = "*/*"
++            intent.putExtra(Intent.EXTRA_STREAM, tab.uri)
++            intent.putExtra(Intent.EXTRA_SUBJECT, tab.name)
++            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
++        } else {
++            intent.type = "text/plain"
++            intent.putExtra(Intent.EXTRA_TEXT, binding.editor.text?.toString() ?: "")
++            intent.putExtra(Intent.EXTRA_SUBJECT, tab.name)
++        }
++        startActivity(Intent.createChooser(intent, "Share file"))
++    }
++
++    // (21) Editor tour: steps dialog sequence; Skip/Done par dobara nahi.
++    private fun showFollowupTour(force: Boolean) {
++        if (!force && FollowupStore.isTourShown(this)) return
++        fun showStep(index: Int) {
++            if (index >= FollowupTour.steps.size) {
++                FollowupStore.setTourShown(this)
++                return
++            }
++            val step = FollowupTour.steps[index]
++            val last = index == FollowupTour.steps.size - 1
++            MaterialAlertDialogBuilder(this)
++                .setTitle(step.title)
++                .setMessage(step.body)
++                .setPositiveButton(if (last) "Done" else "Next") { _, _ ->
++                    if (last) FollowupStore.setTourShown(this) else showStep(index + 1)
++                }
++                .setNegativeButton("Skip") { _, _ -> FollowupStore.setTourShown(this) }
++                .setCancelable(false)
++                .show()
++        }
++        showStep(0)
++    }
++
++    // (22) File info: size, modified date, permissions, path + Copy path.
++    private fun showFollowupFileInfo() {
++        val tab = openTabs.getOrNull(activeTabIndex) ?: run {
++            Toast.makeText(this, "No file open", Toast.LENGTH_SHORT).show()
++            return
++        }
++        val doc = try {
++            tab.uri?.let { DocumentFile.fromSingleUri(this, it) }
++        } catch (e: Exception) {
++            null
++        }
++        val sizeBytes: Long = try {
++            doc?.length() ?: binding.editor.text?.toString()?.toByteArray()?.size?.toLong() ?: 0L
++        } catch (e: Exception) {
++            0L
++        }
++        val sizeText = when {
++            sizeBytes < 1024 -> "$sizeBytes B"
++            sizeBytes < 1024 * 1024 -> "%.1f KB".format(sizeBytes / 1024.0)
++            else -> "%.1f MB".format(sizeBytes / (1024.0 * 1024.0))
++        }
++        val modifiedText = try {
++            val m = doc?.lastModified() ?: 0L
++            if (m > 0) {
++                SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(m))
++            } else {
++                "Unsaved"
++            }
++        } catch (e: Exception) {
++            "Unknown"
++        }
++        val permsText = if (doc == null) {
++            "Unsaved file"
++        } else {
++            val read = if (doc.canRead()) "Read" else "No read"
++            val write = if (doc.canWrite()) "Write" else "No write"
++            "$read, $write"
++        }
++        val pathText = tab.path ?: tab.uri?.toString() ?: "Unsaved file"
++        val message = "Name: ${tab.name}\nSize: $sizeText\nModified: $modifiedText\n" +
++            "Permissions: $permsText\nPath: $pathText"
++        MaterialAlertDialogBuilder(this)
++            .setTitle("File info")
++            .setMessage(message)
++            .setPositiveButton("Copy path") { _, _ ->
++                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
++                clipboard.setPrimaryClip(ClipData.newPlainText("File path", pathText))
++                Toast.makeText(this, "Path copied", Toast.LENGTH_SHORT).show()
++            }
++            .setNegativeButton("Close", null)
++            .show()
++    }
++
++    // Save hook (19): line ending save par lagu hoti hai (encoding byte
++    // write saveLocalTabContent me hota hai).
++    private fun applyFollowupSaveText(tab: EditorTab, text: String): String {
++        val ending = FollowupStore.lineEndingFor(this, tab.uri?.toString())
++        return FollowupEncoding.convertLineEndings(text, ending == "CRLF")
++    }
++
+ }
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt	2026-10-25 15:41:07.832599521 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt	2026-10-25 15:41:08.178639509 +0000
+@@ -276,6 +276,14 @@
+     private val hlKeywordRegex = Regex("\\b($hlKeywords)\\b")
+     private val hlFuncRegex = Regex("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(")
+     // PERF: last highlighted line range — scroll par sirf naya area highlight hoga
++    // v11 follow-up (2): large-file fast mode — tighter visible-range buffer.
++    var fastHighlightBuffer: Int = 120
++        private set
++    fun applyFastMode(large: Boolean) {
++        fastHighlightBuffer = if (large) 40 else 120
++        hlStartLine = -1
++        hlEndLine = -1
++    }
+     private var hlStartLine = -1
+     private var hlEndLine = -1
+     // PERF: cached density (onDraw me har bar resources access expensive hai)
+@@ -603,7 +611,7 @@
+         if (l == null || total <= 0) return 0 to 0
+         val first = (scrollY / lineHeight).coerceAtLeast(0)
+         val last = ((scrollY + height) / lineHeight + 1).coerceAtMost(total - 1)
+-        val buf = 120
++        val buf = fastHighlightBuffer
+         return (first - buf).coerceAtLeast(0) to (last + buf).coerceAtMost(total - 1)
+     }
+ 
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt	2026-10-25 15:41:08.188168807 +0000
+@@ -0,0 +1,60 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (12): offline cheat sheets bundled as text. No network
++ * call is ever made; the sheets are short on purpose so they render
++ * instantly in a scrollable dialog.
++ */
++object FollowupCheatSheets {
++
++    val sheets: Map<String, String> = mapOf(
++        "Python" to
++            "Variables: x = 10 | name = \"Sam\"\n" +
++            "Print: print(\"Hello\", x)\n" +
++            "If: if x > 5: ... elif ...: ... else: ...\n" +
++            "Loop: for item in items: ... | while x > 0: ...\n" +
++            "Function: def greet(name): return \"Hi \" + name\n" +
++            "List: items = [1, 2, 3] | items.append(4)\n" +
++            "Dict: user = {\"name\": \"Sam\", \"age\": 20}\n" +
++            "String: text.upper() | text.strip() | text.split(\",\")\n" +
++            "File: with open(\"a.txt\") as f: data = f.read()\n" +
++            "Try: try: ... except Exception as e: ...\n" +
++            "Class: class Dog: def __init__(self, name): ...\n" +
++            "Import: import os | from math import sqrt\n",
++        "HTML" to
++            "Page: <!DOCTYPE html> <html> <head> <body>\n" +
++            "Heading: <h1>Title</h1> ... <h6>\n" +
++            "Text: <p>Paragraph</p> <b>Bold</b> <i>Italic</i>\n" +
++            "Link: <a href=\"https://example.com\">Text</a>\n" +
++            "Image: <img src=\"pic.png\" alt=\"Photo\">\n" +
++            "List: <ul><li>Item</li></ul> | <ol> for numbers\n" +
++            "Table: <table><tr><td>Cell</td></tr></table>\n" +
++            "Form: <form><input type=\"text\"><button>Go</button></form>\n" +
++            "Div: <div class=\"box\">...</div>\n" +
++            "Comment: <!-- note -->\n",
++        "Java" to
++            "Class: public class Main { ... }\n" +
++            "Main: public static void main(String[] args) { ... }\n" +
++            "Print: System.out.println(\"Hello\");\n" +
++            "Variables: int n = 5; String s = \"Hi\"; boolean ok = true;\n" +
++            "If: if (n > 0) { ... } else { ... }\n" +
++            "Loop: for (int i = 0; i < 10; i++) { ... }\n" +
++            "Method: int add(int a, int b) { return a + b; }\n" +
++            "List: ArrayList<String> list = new ArrayList<>();\n" +
++            "Try: try { ... } catch (Exception e) { ... }\n" +
++            "Comment: // line | /* block */\n",
++        "Kotlin" to
++            "Function: fun greet(name: String): String { ... }\n" +
++            "Main: fun main() { println(\"Hello\") }\n" +
++            "Variables: val fixed = 5 | var changeable = 5\n" +
++            "Null: String? | value?.length | value ?: \"default\"\n" +
++            "If: val out = if (x > 0) \"pos\" else \"neg\"\n" +
++            "When: when (x) { 1 -> \"one\" else -> \"other\" }\n" +
++            "Loop: for (item in list) { ... } | repeat(3) { ... }\n" +
++            "List: listOf(1, 2) | mutableListOf<String>()\n" +
++            "Class: class User(val name: String)\n" +
++            "Lambda: list.map { it * 2 } | list.filter { it > 0 }\n"
++    )
++
++    fun languages(): List<String> = sheets.keys.toList()
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupDiff.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupDiff.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupDiff.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupDiff.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupDiff.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupDiff.kt	2026-10-25 15:41:08.185861790 +0000
+@@ -0,0 +1,54 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (13): line-based diff used for the pre-count shown before
++ * the existing CompareActivity opens. Classic LCS table, same shape as the
++ * one CompareActivity already uses; files over 1000 lines are flagged as
++ * too large so the caller shows a plain view instead of allocating a
++ * huge table (performance rule: never block the UI thread with this —
++ * callers run it on Dispatchers.Default).
++ */
++object FollowupDiff {
++
++    data class Result(
++        val changedInA: Set<Int>,
++        val changedInB: Set<Int>,
++        val differingLines: Int,
++        val tooLarge: Boolean
++    )
++
++    fun diff(a: List<String>, b: List<String>): Result {
++        if (a.size > 1000 || b.size > 1000) {
++            return Result(emptySet(), emptySet(), 0, true)
++        }
++        val n = a.size
++        val m = b.size
++        val w = m + 1
++        val table = IntArray((n + 1) * w)
++        for (i in n - 1 downTo 0) {
++            for (j in m - 1 downTo 0) {
++                table[i * w + j] = if (a[i] == b[j]) table[(i + 1) * w + j + 1] + 1
++                    else maxOf(table[(i + 1) * w + j], table[i * w + j + 1])
++            }
++        }
++        val diffA = HashSet<Int>()
++        val diffB = HashSet<Int>()
++        var i = 0
++        var j = 0
++        while (i < n && j < m) {
++            if (a[i] == b[j]) {
++                i++
++                j++
++            } else if (table[(i + 1) * w + j] >= table[i * w + j + 1]) {
++                diffA.add(i)
++                i++
++            } else {
++                diffB.add(j)
++                j++
++            }
++        }
++        while (i < n) diffA.add(i++)
++        while (j < m) diffB.add(j++)
++        return Result(diffA, diffB, maxOf(diffA.size, diffB.size), false)
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupEncoding.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupEncoding.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupEncoding.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupEncoding.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupEncoding.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupEncoding.kt	2026-10-25 15:41:08.186160018 +0000
+@@ -0,0 +1,32 @@
++package com.nobidev.nobicode.followup
++
++import java.nio.charset.Charset
++
++/**
++ * v11 follow-up (19): encoding + line-ending handling. The chosen charset
++ * is used both when writing (save path) and when reading (open path), so
++ * a file saved as UTF-16LE reopens as UTF-16LE instead of mojibake.
++ * Line endings are normalised at save time, so edits typed with plain
++ * newlines still save in the chosen style.
++ */
++object FollowupEncoding {
++
++    val encodings: List<String> = listOf("UTF-8", "UTF-16LE", "UTF-16BE", "ISO-8859-1")
++
++    fun charsetFor(name: String): Charset {
++        return try {
++            Charset.forName(name)
++        } catch (e: Exception) {
++            Charsets.UTF_8
++        }
++    }
++
++    fun detectLineEnding(text: String): String {
++        return if (text.contains("\r\n")) "CRLF" else "LF"
++    }
++
++    fun convertLineEndings(text: String, toCRLF: Boolean): String {
++        val lf = text.replace("\r\n", "\n").replace('\r', '\n')
++        return if (toCRLF) lf.replace("\n", "\r\n") else lf
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupFuzzy.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupFuzzy.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupFuzzy.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupFuzzy.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupFuzzy.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupFuzzy.kt	2026-10-25 15:41:08.188049149 +0000
+@@ -0,0 +1,51 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (1): fuzzy file matching for the quick file switcher.
++ * Pure logic, no Android types, so it stays cheap: subsequence scoring
++ * with bonuses for word starts and consecutive runs. Runs on a background
++ * thread in the caller; only the top 50 results are ever shown.
++ */
++object FollowupFuzzy {
++
++    /** Returns a score >= 0 for a subsequence match, or -1 for no match. */
++    fun score(query: String, target: String): Int {
++        val q = query.lowercase().trim()
++        if (q.isEmpty()) return 0
++        val t = target.lowercase()
++        var ti = 0
++        var total = 0
++        var consecutive = 0
++        for (qc in q) {
++            var found = false
++            while (ti < t.length) {
++                val tc = t[ti]
++                ti++
++                if (tc == qc) {
++                    found = true
++                    var bonus = 10
++                    if (ti == 1 || t[ti - 2] == '/' || t[ti - 2] == '_' ||
++                        t[ti - 2] == '-' || t[ti - 2] == '.'
++                    ) bonus += 20
++                    if (consecutive > 0) bonus += 15
++                    total += bonus
++                    consecutive++
++                    break
++                } else {
++                    consecutive = 0
++                }
++            }
++            if (!found) return -1
++        }
++        // Short names that match early rank above long paths.
++        return total - (t.length / 20)
++    }
++
++    /** Best score across a name and its path; -1 when neither matches. */
++    fun scoreFile(query: String, name: String, path: String): Int {
++        if (query.isBlank()) return 0
++        val byName = score(query, name)
++        val byPath = score(query, path)
++        return maxOf(byName, byPath)
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupHex.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupHex.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupHex.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupHex.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupHex.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupHex.kt	2026-10-25 15:41:08.187932550 +0000
+@@ -0,0 +1,35 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (5): #RRGGBB handling. Finds the hex token under the
++ * caret so a tap on a color in code opens the picker, and validates a
++ * typed replacement before it is written back into the document.
++ */
++object FollowupHex {
++
++    private val hexRegex = Regex("#([0-9A-Fa-f]{6})\\b")
++
++    data class Found(val start: Int, val end: Int, val hex: String)
++
++    /** Hex token containing [offset], or null when the caret is not on one. */
++    fun findAt(text: CharSequence, offset: Int): Found? {
++        for (m in hexRegex.findAll(text)) {
++            if (offset in m.range) {
++                return Found(m.range.first, m.range.last + 1, m.value)
++            }
++        }
++        return null
++    }
++
++    fun isValid(hex: String): Boolean {
++        return hexRegex.matches(hex.trim())
++    }
++
++    fun normalize(hex: String): String = hex.trim().uppercase()
++
++    val presets: List<String> = listOf(
++        "#FF0000", "#FF9800", "#FFEB3B", "#4CAF50", "#2196F3",
++        "#8B5CF6", "#E91E63", "#00BCD4", "#795548", "#000000",
++        "#FFFFFF", "#9E9E9E"
++    )
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupLint.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupLint.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupLint.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupLint.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupLint.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupLint.kt	2026-10-25 15:41:08.185732152 +0000
+@@ -0,0 +1,158 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (18): simple OFFLINE lint. No network, no language server.
++ * Deliberately conservative so it does not cry wolf: it only reports
++ * unbalanced brackets (strings and comments skipped), trailing whitespace,
++ * mixed tab/space indentation in Python, and unclosed HTML tags. Callers
++ * run it debounced on a background thread and cap the issues shown.
++ */
++object FollowupLint {
++
++    data class Issue(val line: Int, val message: String)
++
++    private val voidTags = setOf(
++        "area", "base", "br", "col", "embed", "hr", "img", "input",
++        "link", "meta", "param", "source", "track", "wbr"
++    )
++
++    fun lint(text: String, ext: String): List<Issue> {
++        val issues = ArrayList<Issue>()
++        val lines = text.split("\n")
++        if (ext == "html" || ext == "htm" || ext == "xml") {
++            lintHtml(lines, issues)
++        } else {
++            lintBrackets(text, ext, issues)
++        }
++        for ((idx, line) in lines.withIndex()) {
++            if (issues.size >= 100) break
++            if (line.endsWith(" ") || line.endsWith("\t")) {
++                issues.add(Issue(idx + 1, "Trailing whitespace"))
++            }
++            if (ext == "py" && line.startsWith(" ") && line.contains("\t")) {
++                issues.add(Issue(idx + 1, "Mixed tabs and spaces in indentation"))
++            }
++        }
++        return issues
++    }
++
++    private fun lintBrackets(text: String, ext: String, issues: MutableList<Issue>) {
++        val isPython = ext == "py"
++        val stack = ArrayDeque<Pair<Char, Int>>()
++        var inSingle = false
++        var inDouble = false
++        var inLineComment = false
++        var inBlockComment = false
++        var escaped = false
++        var line = 1
++        var i = 0
++        fun matching(open: Char, close: Char): Boolean {
++            return (open == '(' && close == ')') || (open == '[' && close == ']') ||
++                (open == '{' && close == '}')
++        }
++        while (i < text.length) {
++            val c = text[i]
++            if (c == '\n') {
++                line++
++                inLineComment = false
++                i++
++                continue
++            }
++            if (inLineComment) {
++                i++
++                continue
++            }
++            if (inBlockComment) {
++                if (c == '*' && i + 1 < text.length && text[i + 1] == '/') {
++                    inBlockComment = false
++                    i += 2
++                } else {
++                    i++
++                }
++                continue
++            }
++            if (inSingle || inDouble) {
++                if (escaped) {
++                    escaped = false
++                } else if (c == '\\' && !isPython) {
++                    escaped = true
++                } else if (inSingle && c == '\'') {
++                    inSingle = false
++                } else if (inDouble && c == '"') {
++                    inDouble = false
++                }
++                i++
++                continue
++            }
++            if (!isPython && c == '/' && i + 1 < text.length && text[i + 1] == '/') {
++                inLineComment = true
++                i += 2
++                continue
++            }
++            if (!isPython && c == '/' && i + 1 < text.length && text[i + 1] == '*') {
++                inBlockComment = true
++                i += 2
++                continue
++            }
++            if (isPython && c == '#') {
++                inLineComment = true
++                i++
++                continue
++            }
++            when (c) {
++                '\'' -> inSingle = true
++                '"' -> inDouble = true
++                '(', '[', '{' -> stack.addLast(c to line)
++                ')', ']', '}' -> {
++                    val open = stack.removeLastOrNull()
++                    if (open == null) {
++                        if (issues.size < 100) {
++                            issues.add(Issue(line, "Unmatched closing '$c'"))
++                        }
++                    } else if (!matching(open.first, c)) {
++                        if (issues.size < 100) {
++                            issues.add(
++                                Issue(line, "Mismatched bracket: '${open.first}' closed by '$c'")
++                            )
++                        }
++                    }
++                }
++            }
++            i++
++        }
++        for ((open, openLine) in stack) {
++            if (issues.size >= 100) break
++            issues.add(Issue(openLine, "Unclosed '$open'"))
++        }
++    }
++
++    private fun lintHtml(lines: List<String>, issues: MutableList<Issue>) {
++        val tagRegex = Regex("</?([A-Za-z][A-Za-z0-9-]*)[^>]*?/?>")
++        val stack = ArrayDeque<Pair<String, Int>>()
++        for ((idx, rawLine) in lines.withIndex()) {
++            if (issues.size >= 100) break
++            val line = rawLine.replace(Regex("<!--.*?-->"), "")
++            for (m in tagRegex.findAll(line)) {
++                val whole = m.value
++                val name = m.groupValues[1].lowercase()
++                if (name in voidTags || whole.endsWith("/>")) continue
++                if (whole.startsWith("</")) {
++                    val open = stack.removeLastOrNull()
++                    if (open == null) {
++                        issues.add(Issue(idx + 1, "Closing tag </$name> without an opener"))
++                    } else if (open.first != name) {
++                        issues.add(
++                            Issue(idx + 1, "Mismatched tag: <${open.first}> closed by </$name>")
++                        )
++                    }
++                } else {
++                    stack.addLast(name to idx + 1)
++                }
++            }
++        }
++        for ((name, openLine) in stack) {
++            if (issues.size >= 100) break
++            issues.add(Issue(openLine, "Unclosed tag <$name>"))
++        }
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSplitActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSplitActivity.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSplitActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSplitActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSplitActivity.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSplitActivity.kt	2026-10-25 15:41:08.188266181 +0000
+@@ -0,0 +1,127 @@
++package com.nobidev.nobicode.followup
++
++import android.content.res.Configuration
++import android.os.Bundle
++import android.view.View
++import android.widget.Button
++import android.widget.LinearLayout
++import android.widget.TextView
++import android.widget.Toast
++import androidx.appcompat.app.AppCompatActivity
++import androidx.lifecycle.lifecycleScope
++import com.nobidev.nobicode.R
++import com.nobidev.nobicode.editor.CodeEditorView
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++
++/**
++ * v11 follow-up (15): split editor panes. Two saved files open side by
++ * side in landscape (stacked in portrait, still independently editable),
++ * each in its own CodeEditorView. Save writes both files back through
++ * the content resolver with their stored encoding and line ending.
++ */
++class FollowupSplitActivity : AppCompatActivity() {
++
++    private lateinit var editorA: CodeEditorView
++    private lateinit var editorB: CodeEditorView
++    private var uriA: String? = null
++    private var uriB: String? = null
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        setContentView(R.layout.activity_followup_split)
++
++        uriA = intent.getStringExtra("split_a_uri")
++        uriB = intent.getStringExtra("split_b_uri")
++        val nameA = intent.getStringExtra("split_a_name") ?: "File A"
++        val nameB = intent.getStringExtra("split_b_name") ?: "File B"
++        if (uriA.isNullOrBlank() || uriB.isNullOrBlank()) {
++            Toast.makeText(this, "Split editor needs two saved files", Toast.LENGTH_SHORT).show()
++            finish()
++            return
++        }
++
++        findViewById<TextView>(R.id.splitTitleA).text = nameA
++        findViewById<TextView>(R.id.splitTitleB).text = nameB
++        editorA = findViewById(R.id.splitEditorA)
++        editorB = findViewById(R.id.splitEditorB)
++
++        val panes = findViewById<LinearLayout>(R.id.splitPanes)
++        val landscape =
++            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
++        panes.orientation =
++            if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
++        // Weight works on the pane axis only: give each editor a 0dp size
++        // on that axis and full size on the other, per orientation.
++        for (ed in listOf(editorA, editorB)) {
++            ed.layoutParams = LinearLayout.LayoutParams(
++                if (landscape) 0 else LinearLayout.LayoutParams.MATCH_PARENT,
++                if (landscape) LinearLayout.LayoutParams.MATCH_PARENT else 0,
++                1f
++            )
++        }
++        if (!landscape) {
++            Toast.makeText(
++                this, "Rotate to landscape for side-by-side panes", Toast.LENGTH_LONG
++            ).show()
++        }
++
++        findViewById<Button>(R.id.splitSaveBtn).setOnClickListener { saveBoth() }
++        findViewById<Button>(R.id.splitCloseBtn).setOnClickListener { finish() }
++
++        lifecycleScope.launch {
++            val textA = withContext(Dispatchers.IO) { readUri(uriA) }
++            val textB = withContext(Dispatchers.IO) { readUri(uriB) }
++            if (textA == null || textB == null) {
++                Toast.makeText(this@FollowupSplitActivity, "Could not read one of the files", Toast.LENGTH_SHORT).show()
++                finish()
++                return@launch
++            }
++            editorA.setTextCleanly(textA)
++            editorB.setTextCleanly(textB)
++        }
++    }
++
++    private fun readUri(uriString: String?): String? {
++        if (uriString.isNullOrBlank()) return null
++        return try {
++            val uri = android.net.Uri.parse(uriString)
++            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
++            val enc = FollowupStore.encodingFor(this, uriString)
++            String(bytes, FollowupEncoding.charsetFor(enc))
++        } catch (e: Exception) {
++            null
++        }
++    }
++
++    private fun saveBoth() {
++        lifecycleScope.launch {
++            val ok = withContext(Dispatchers.IO) {
++                writeUri(uriA, editorA.text?.toString() ?: "") &&
++                    writeUri(uriB, editorB.text?.toString() ?: "")
++            }
++            Toast.makeText(
++                this@FollowupSplitActivity,
++                if (ok) "Both files saved" else "Save failed for one of the files",
++                Toast.LENGTH_SHORT
++            ).show()
++        }
++    }
++
++    private fun writeUri(uriString: String?, text: String): Boolean {
++        if (uriString.isNullOrBlank()) return false
++        return try {
++            val uri = android.net.Uri.parse(uriString)
++            val ending = FollowupStore.lineEndingFor(this, uriString)
++            val converted = FollowupEncoding.convertLineEndings(text, ending == "CRLF")
++            val enc = FollowupStore.encodingFor(this, uriString)
++            contentResolver.openOutputStream(uri, "wt")?.use { out ->
++                out.write(converted.toByteArray(FollowupEncoding.charsetFor(enc)))
++            }
++            true
++        } catch (e: Exception) {
++            false
++        }
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupStore.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupStore.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupStore.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupStore.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupStore.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupStore.kt	2026-10-25 15:41:08.188363993 +0000
+@@ -0,0 +1,193 @@
++package com.nobidev.nobicode.followup
++
++import android.content.Context
++import org.json.JSONArray
++import org.json.JSONObject
++
++/**
++ * v11 follow-up persistence. All keys are NEW ("nobi_v11_...") in their
++ * own SharedPreferences file, so no existing preference key is touched
++ * or renamed. Lists are bounded (recent files: 20, workspaces: 30) and
++ * stored as small JSON, never as unbounded text.
++ */
++object FollowupStore {
++
++    private const val FILE = "nobi_v11_prefs"
++
++    private fun prefs(context: Context) =
++        context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
++
++    // ---- Recent files (4) ----
++
++    data class RecentFile(val uri: String, val name: String, val time: Long)
++
++    fun recordRecent(context: Context, uri: String?, name: String) {
++        if (uri.isNullOrBlank()) return
++        val items = recentFiles(context).filter { it.uri != uri }.toMutableList()
++        items.add(0, RecentFile(uri, name, System.currentTimeMillis()))
++        val arr = JSONArray()
++        for (item in items.take(20)) {
++            arr.put(
++                JSONObject().put("uri", item.uri).put("name", item.name).put("time", item.time)
++            )
++        }
++        prefs(context).edit().putString("nobi_v11_recent_files", arr.toString()).apply()
++    }
++
++    fun recentFiles(context: Context): List<RecentFile> {
++        val out = ArrayList<RecentFile>()
++        try {
++            val arr = JSONArray(prefs(context).getString("nobi_v11_recent_files", "[]") ?: "[]")
++            for (i in 0 until arr.length()) {
++                val obj = arr.getJSONObject(i)
++                out.add(RecentFile(obj.getString("uri"), obj.getString("name"), obj.optLong("time")))
++            }
++        } catch (e: Exception) {
++        }
++        return out
++    }
++
++    // ---- Workspaces (11) ----
++
++    data class Workspace(val name: String, val uri: String)
++
++    fun workspaces(context: Context): List<Workspace> {
++        val out = ArrayList<Workspace>()
++        try {
++            val arr = JSONArray(prefs(context).getString("nobi_v11_workspaces", "[]") ?: "[]")
++            for (i in 0 until arr.length()) {
++                val obj = arr.getJSONObject(i)
++                out.add(Workspace(obj.getString("name"), obj.getString("uri")))
++            }
++        } catch (e: Exception) {
++        }
++        return out
++    }
++
++    fun addWorkspace(context: Context, name: String, uri: String) {
++        val items = workspaces(context).filter { it.uri != uri }.toMutableList()
++        items.add(Workspace(name, uri))
++        saveWorkspaces(context, items.take(30))
++    }
++
++    fun removeWorkspace(context: Context, uri: String) {
++        saveWorkspaces(context, workspaces(context).filter { it.uri != uri })
++    }
++
++    private fun saveWorkspaces(context: Context, items: List<Workspace>) {
++        val arr = JSONArray()
++        for (item in items) {
++            arr.put(JSONObject().put("name", item.name).put("uri", item.uri))
++        }
++        prefs(context).edit().putString("nobi_v11_workspaces", arr.toString()).apply()
++    }
++
++    // ---- Custom toolbar (17): order + disabled set ----
++
++    fun toolbarOrder(context: Context): List<String> {
++        val raw = prefs(context).getString("nobi_v11_toolbar_order", null)
++        if (raw.isNullOrBlank()) return defaultToolIds()
++        return try {
++            val arr = JSONArray(raw)
++            val out = ArrayList<String>()
++            for (i in 0 until arr.length()) out.add(arr.getString(i))
++            val missing = defaultToolIds().filter { it !in out }
++            out + missing
++        } catch (e: Exception) {
++            defaultToolIds()
++        }
++    }
++
++    fun setToolbarOrder(context: Context, ids: List<String>) {
++        val arr = JSONArray()
++        for (id in ids) arr.put(id)
++        prefs(context).edit().putString("nobi_v11_toolbar_order", arr.toString()).apply()
++    }
++
++    fun toolbarDisabled(context: Context): Set<String> {
++        return try {
++            val arr = JSONArray(prefs(context).getString("nobi_v11_toolbar_disabled", "[]") ?: "[]")
++            val out = HashSet<String>()
++            for (i in 0 until arr.length()) out.add(arr.getString(i))
++            out
++        } catch (e: Exception) {
++            emptySet()
++        }
++    }
++
++    fun setToolbarDisabled(context: Context, ids: Set<String>) {
++        val arr = JSONArray()
++        for (id in ids) arr.put(id)
++        prefs(context).edit().putString("nobi_v11_toolbar_disabled", arr.toString()).apply()
++    }
++
++    fun defaultToolIds(): List<String> = listOf(
++        "quick_switch", "recent", "hex", "templates", "image_preview",
++        "sort_filter", "workspaces", "cheat_sheets", "diff",
++        "find_replace", "split", "terminal_folder", "lint", "encoding",
++        "share", "file_info", "send_terminal", "save_clipboard", "tour",
++        "custom_toolbar", "fast_mode"
++    )
++
++    // ---- Tour (21) ----
++
++    fun isTourShown(context: Context): Boolean {
++        return prefs(context).getBoolean("nobi_v11_tour_shown", false)
++    }
++
++    fun setTourShown(context: Context) {
++        prefs(context).edit().putBoolean("nobi_v11_tour_shown", true).apply()
++    }
++
++    // ---- Encoding + line endings (19), per file uri ----
++
++    fun encodingFor(context: Context, uri: String?): String {
++        if (uri.isNullOrBlank()) return "UTF-8"
++        return prefs(context).getString("nobi_v11_enc_$uri", "UTF-8") ?: "UTF-8"
++    }
++
++    fun setEncoding(context: Context, uri: String?, encoding: String) {
++        if (uri.isNullOrBlank()) return
++        prefs(context).edit().putString("nobi_v11_enc_$uri", encoding).apply()
++    }
++
++    fun lineEndingFor(context: Context, uri: String?): String {
++        if (uri.isNullOrBlank()) return "LF"
++        return prefs(context).getString("nobi_v11_le_$uri", "LF") ?: "LF"
++    }
++
++    fun setLineEnding(context: Context, uri: String?, ending: String) {
++        if (uri.isNullOrBlank()) return
++        prefs(context).edit().putString("nobi_v11_le_$uri", ending).apply()
++    }
++
++    // ---- Browser sort + filter (10) ----
++
++    fun browserSort(context: Context): String {
++        return prefs(context).getString("nobi_v11_browser_sort", "name") ?: "name"
++    }
++
++    fun setBrowserSort(context: Context, sort: String) {
++        prefs(context).edit().putString("nobi_v11_browser_sort", sort).apply()
++    }
++
++    fun browserTypeFilter(context: Context): String {
++        return prefs(context).getString("nobi_v11_browser_filter", "all") ?: "all"
++    }
++
++    fun setBrowserTypeFilter(context: Context, filter: String) {
++        prefs(context).edit().putString("nobi_v11_browser_filter", filter).apply()
++    }
++
++    /** Extension group for the type filter: code / image / doc / other. */
++    fun typeGroup(fileName: String): String {
++        val ext = fileName.substringAfterLast('.', "").lowercase()
++        return when (ext) {
++            "kt", "kts", "java", "py", "js", "ts", "html", "htm", "xml",
++            "css", "json", "c", "cpp", "h", "sh", "gradle" -> "code"
++            "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg" -> "image"
++            "md", "txt", "pdf", "doc", "docx" -> "doc"
++            else -> "other"
++        }
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSymbols.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSymbols.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSymbols.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSymbols.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSymbols.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupSymbols.kt	2026-10-25 15:41:08.186044289 +0000
+@@ -0,0 +1,50 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (8): per-language symbols row. The editor's symbols bar
++ * rebuilds from this list whenever the active file changes, so Python
++ * files get Python tokens, HTML files get tags, and so on. The generic
++ * list is the bar the editor already had, kept as the fallback.
++ */
++object FollowupSymbols {
++
++    private val generic = listOf(
++        "Tab", "(", ")", "{", "}", "[", "]", ";", ":", ",", ".",
++        "\"", "'", "=", "+", "-", "*", "/", "<", ">", "!", "?", "&", "|",
++        "_", "#", "$", "@", "\\", "~", "^", "%"
++    )
++
++    private val python = listOf(
++        "Tab", "def ", "class ", ":", "(", ")", "[", "]", "#", "\"\"\"",
++        "f\"", "import ", "from ", "return ", "if ", "elif ", "else:",
++        "for ", "while ", "print(", "self", "=", "==", "->", "None"
++    )
++
++    private val html = listOf(
++        "Tab", "<", ">", "/", "=", "\"", "<div>", "</div>", "<p>",
++        "</p>", "<span>", "</span>", "class=", "id=", "<!--", "-->",
++        "<a href=\"\">", "<img src=\"\">", "<ul>", "<li>"
++    )
++
++    private val java = listOf(
++        "Tab", "(", ")", "{", "}", "[", "]", ";", "public ", "private ",
++        "static ", "void ", "class ", "new ", "return ", "if ", "for ",
++        "System.out.println(", "\"", "import ", "extends ", "this."
++    )
++
++    private val kotlin = listOf(
++        "Tab", "(", ")", "{", "}", "[", "]", "fun ", "val ", "var ",
++        "class ", "return ", "if ", "when ", "for ", "println(",
++        "\"", "?.", "?:", "->", "import ", "data class ", "object "
++    )
++
++    fun symbolsFor(ext: String): List<String> {
++        return when (ext.lowercase()) {
++            "py" -> python
++            "html", "htm", "xml" -> html
++            "java" -> java
++            "kt", "kts" -> kotlin
++            else -> generic
++        }
++    }
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTemplates.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTemplates.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTemplates.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTemplates.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTemplates.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTemplates.kt	2026-10-25 15:41:08.185952362 +0000
+@@ -0,0 +1,36 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (6): one-tap file templates. Tapping a template opens a
++ * new editor tab with that file name (so language detection works) and
++ * the template text inside; the user saves it wherever they want with
++ * Save As. No network, no new files on disk until the user saves.
++ */
++object FollowupTemplates {
++
++    data class Template(val label: String, val fileName: String, val content: String)
++
++    val all: List<Template> = listOf(
++        Template(
++            "HTML page", "index.html",
++            "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n" +
++                "    <meta charset=\"UTF-8\">\n" +
++                "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
++                "    <title>New page</title>\n</head>\n<body>\n    <h1>Hello</h1>\n" +
++                "    <p>Start writing here.</p>\n</body>\n</html>\n"
++        ),
++        Template(
++            "Python script", "main.py",
++            "def main():\n    print(\"Hello\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
++        ),
++        Template(
++            "Java class", "Main.java",
++            "public class Main {\n    public static void main(String[] args) {\n" +
++                "        System.out.println(\"Hello\");\n    }\n}\n"
++        ),
++        Template(
++            "Kotlin file", "Main.kt",
++            "fun main() {\n    println(\"Hello\")\n}\n"
++        )
++    )
++}
+diff -ruN a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTour.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTour.kt
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTour.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTour.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTour.kt	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupTour.kt	2026-10-25 15:41:08.186270607 +0000
+@@ -0,0 +1,46 @@
++package com.nobidev.nobicode.followup
++
++/**
++ * v11 follow-up (21): first-run editor tour. Shown once, the first time
++ * the editor opens; Skip or finishing sets the flag so it never appears
++ * again on its own (the user can still reopen it from Editor tools).
++ */
++object FollowupTour {
++
++    data class Step(val title: String, val body: String)
++
++    val steps: List<Step> = listOf(
++        Step(
++            "Welcome to the editor",
++            "Open a folder from the drawer, then tap any file to edit it. " +
++                "Use the toolbar menu for Save, Find, and more."
++        ),
++        Step(
++            "Quick file switcher",
++            "Open Editor tools, then Quick file switcher, and type a few " +
++                "letters of any file name to jump straight to it."
++        ),
++        Step(
++            "Symbols row",
++            "The row above the footer inserts brackets and language " +
++                "symbols at the caret. It changes with the file language."
++        ),
++        Step(
++            "Editor tools",
++            "Editor tools in the toolbar menu holds the rest: recent " +
++                "files, templates, cheat sheets, file compare, split " +
++                "editor, lint, sharing, and file info."
++        ),
++        Step(
++            "Terminal in this folder",
++            "Editor tools, then Open terminal in file's folder, opens " +
++                "the terminal in the folder of the file you are editing."
++        ),
++        Step(
++            "You are set",
++            "That is the whole tour. Open Editor tools any time to " +
++                "revisit these, and customise the tools row from " +
++                "Customise toolbar."
++        )
++    )
++}
+diff -ruN a/termux-app/nobicode/src/main/res/layout/activity_followup_split.xml b/termux-app/nobicode/src/main/res/layout/activity_followup_split.xml
+diff --git a/termux-app/nobicode/src/main/res/layout/activity_followup_split.xml b/termux-app/nobicode/src/main/res/layout/activity_followup_split.xml
+--- a/termux-app/nobicode/src/main/res/layout/activity_followup_split.xml	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/res/layout/activity_followup_split.xml	2026-10-25 15:41:08.462327873 +0000
+@@ -0,0 +1,75 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:orientation="vertical"
++    android:background="?attr/colorSurface">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="center_vertical"
++        android:padding="8dp">
++
++        <TextView
++            android:id="@+id/splitTitleA"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:ellipsize="end"
++            android:maxLines="1"
++            android:text="File A"
++            android:textStyle="bold" />
++
++        <Button
++            android:id="@+id/splitSaveBtn"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="Save both" />
++
++        <Button
++            android:id="@+id/splitCloseBtn"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="Close" />
++
++        <TextView
++            android:id="@+id/splitTitleB"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:ellipsize="end"
++            android:gravity="end"
++            android:maxLines="1"
++            android:text="File B"
++            android:textStyle="bold" />
++
++    </LinearLayout>
++
++    <LinearLayout
++        android:id="@+id/splitPanes"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:orientation="horizontal">
++
++        <com.nobidev.nobicode.editor.CodeEditorView
++            android:id="@+id/splitEditorA"
++            android:layout_width="0dp"
++            android:layout_height="match_parent"
++            android:layout_weight="1" />
++
++        <View
++            android:layout_width="1dp"
++            android:layout_height="match_parent"
++            android:background="?attr/colorOutlineVariant" />
++
++        <com.nobidev.nobicode.editor.CodeEditorView
++            android:id="@+id/splitEditorB"
++            android:layout_width="0dp"
++            android:layout_height="match_parent"
++            android:layout_weight="1" />
++
++    </LinearLayout>
++
++</LinearLayout>
+diff -ruN a/termux-app/nobicode/src/main/res/layout/activity_main.xml b/termux-app/nobicode/src/main/res/layout/activity_main.xml
+diff --git a/termux-app/nobicode/src/main/res/layout/activity_main.xml b/termux-app/nobicode/src/main/res/layout/activity_main.xml
+--- a/termux-app/nobicode/src/main/res/layout/activity_main.xml	2026-10-25 15:41:08.094330417 +0000
++++ b/termux-app/nobicode/src/main/res/layout/activity_main.xml	2026-10-25 15:41:08.460743140 +0000
+@@ -196,6 +196,15 @@
+                     android:text="Open File"
+                     app:icon="@drawable/ic_file" />
+ 
++                <com.google.android.material.button.MaterialButton
++                    android:id="@+id/welcomeRecentBtn"
++                    style="@style/Widget.Material3.Button.OutlinedButton"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="12dp"
++                    android:text="@string/followup_recent_button"
++                    app:icon="@drawable/ic_history" />
++
+             </LinearLayout>
+ 
+         </FrameLayout>
+@@ -311,6 +320,26 @@
+             android:background="?attr/colorOutlineVariant"
+             android:alpha="0.4" />
+ 
++        <!-- v11 follow-up (17): custom toolbar row (stored order, max 8 tools) -->
++        <HorizontalScrollView
++            android:id="@+id/followupToolbar"
++            android:layout_width="match_parent"
++            android:layout_height="44dp"
++            android:background="?attr/colorSurfaceContainerLow"
++            android:scrollbars="none"
++            android:fillViewport="true"
++            android:visibility="gone">
++
++            <LinearLayout
++                android:id="@+id/followupToolbarContainer"
++                android:layout_width="wrap_content"
++                android:layout_height="match_parent"
++                android:orientation="horizontal"
++                android:gravity="center_vertical"
++                android:paddingStart="4dp"
++                android:paddingEnd="4dp" />
++        </HorizontalScrollView>
++
+         <!-- Symbols bar: phone keyboard par mushkil wale symbols ek tap par -->
+         <HorizontalScrollView
+             android:id="@+id/symbolsBar"
+diff -ruN a/termux-app/nobicode/src/main/res/menu/main_menu.xml b/termux-app/nobicode/src/main/res/menu/main_menu.xml
+diff --git a/termux-app/nobicode/src/main/res/menu/main_menu.xml b/termux-app/nobicode/src/main/res/menu/main_menu.xml
+--- a/termux-app/nobicode/src/main/res/menu/main_menu.xml	2026-10-25 15:41:08.094644721 +0000
++++ b/termux-app/nobicode/src/main/res/menu/main_menu.xml	2026-10-25 15:41:08.463010894 +0000
+@@ -53,6 +53,12 @@
+         app:showAsAction="never" />
+ 
+     <item
++        android:id="@+id/action_followup"
++        android:title="@string/action_followup"
++        android:icon="@drawable/ic_code"
++        app:showAsAction="never" />
++
++    <item
+         android:id="@+id/action_terminal"
+         android:title="Terminal"
+         android:icon="@drawable/ic_terminal"
+diff -ruN a/termux-app/nobicode/src/main/res/values/nobi_followup_strings.xml b/termux-app/nobicode/src/main/res/values/nobi_followup_strings.xml
+diff --git a/termux-app/nobicode/src/main/res/values/nobi_followup_strings.xml b/termux-app/nobicode/src/main/res/values/nobi_followup_strings.xml
+--- a/termux-app/nobicode/src/main/res/values/nobi_followup_strings.xml	1970-01-01 00:00:00.000000000 +0000
++++ b/termux-app/nobicode/src/main/res/values/nobi_followup_strings.xml	2026-10-25 15:41:08.464034747 +0000
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="action_followup">Editor tools</string>
++    <string name="followup_recent_button">Recent files</string>
++    <string name="followup_menu_title">Editor tools</string>
++    <string name="followup_custom_toolbar_title">Customise toolbar</string>
++</resources>
