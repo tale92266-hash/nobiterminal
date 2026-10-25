@@ -258,6 +258,69 @@ move_bootstraps() {
     fi
 }
 
+
+# Use a sha256-verified cached bootstrap instead of rebuilding it.
+# Env: TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR (dir with bootstrap-*.zip,
+# xz-* files plus bootstrap-cache-manifest.txt listing "<sha256>  <file>").
+# Returns 0 ONLY when every manifest entry exists, matches its sha256, and
+# was copied into the app assets dir (same dir move_bootstraps uses).
+# ANY problem (unset/empty dir, missing manifest, missing file, sha
+# mismatch, empty manifest, no bootstrap zip, terminal disabled) prints a
+# clear rejection line and returns 1, so the caller falls back to a full
+# build_bootstraps. NEVER build an APK from an unverified bootstrap.
+use_cached_bootstrap() {
+    local cache_dir="${TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR:-}"
+    if [ -z "$cache_dir" ]; then
+        echo "[cache] No cached bootstrap dir set, building bootstraps."
+        return 1
+    fi
+    if [ -n "${DISABLE_TERMINAL:-}" ]; then
+        echo "[cache] Terminal disabled, cached bootstrap not applicable, building bootstraps."
+        return 1
+    fi
+    local manifest="$cache_dir/bootstrap-cache-manifest.txt"
+    if [ ! -f "$manifest" ]; then
+        echo "[cache] REJECTED cached bootstrap: manifest missing in $cache_dir, building bootstraps."
+        return 1
+    fi
+    if [ ! -s "$manifest" ]; then
+        echo "[cache] REJECTED cached bootstrap: manifest empty, building bootstraps."
+        return 1
+    fi
+    if ! grep -q 'bootstrap-.*\.zip$' "$manifest"; then
+        echo "[cache] REJECTED cached bootstrap: manifest lists no bootstrap zip, building bootstraps."
+        return 1
+    fi
+    local expected file actual
+    while read -r expected file; do
+        [ -n "$expected" ] || continue
+        [ -n "$file" ] || continue
+        if [ ! -f "$cache_dir/$file" ]; then
+            echo "[cache] REJECTED cached bootstrap: missing file $file, building bootstraps."
+            return 1
+        fi
+        actual=$(sha256sum "$cache_dir/$file" | cut -d' ' -f1)
+        if [ "$actual" != "$expected" ]; then
+            echo "[cache] REJECTED cached bootstrap: sha256 mismatch for $file (expected $expected, got $actual), building bootstraps."
+            return 1
+        fi
+    done < "$manifest"
+    local app_assets_dir
+    if [[ "$TERMUX_APP_TYPE" == "f-droid" ]]; then
+        app_assets_dir="termux-apps-main/termux-app/app/src/main/assets/"
+    else
+        app_assets_dir="termux-apps-main/termux-app/src/main/assets/"
+    fi
+    mkdir -p "$app_assets_dir"
+    while read -r expected file; do
+        [ -n "$file" ] || continue
+        cp "$cache_dir/$file" "$app_assets_dir"
+    done < "$manifest"
+    echo "[cache] Using cached bootstrap (sha256-verified, $(grep -c . "$manifest") files), skipping build_bootstraps"
+    touch "${TERMUX_GENERATOR_HOME:-.}/.bootstrap-cache-hit"
+    return 0
+}
+
 # Funktion, um die App zu bauen
 build_apps() {
     pushd termux-apps-main

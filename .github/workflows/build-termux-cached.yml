@@ -1,0 +1,318 @@
+# NobiTerminal faster build — CACHE TEST workflow (branch cache-test-1)
+# ============================================================================
+# Ye workflow `build-termux.yml` ka hi roop hai, sirf ye judhe hain:
+#  - Cache key: upstream termux-packages HEAD + upstream termux-app HEAD +
+#    generator bootstrap-patches hash + bootstrap package-list hash + arch +
+#    package name. Key me KABHI NAHI: generator branch head, app patch list
+#    (w10/w11/...), timestamp, run id — warna har batch cache MISS hoga.
+#  - Bootstrap restore: PRIMARY GitHub Release asset, tag `bootstrap-cache-test`
+#    (repo-global, koi branch scoping nahi). Missing asset = normal MISS.
+#  - Script flag TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR: sha256-verified
+#    cached bootstrap milne par build_bootstraps SKIP + assets me copy;
+#    na mile / mismatch ho to chupchaap FULL build_bootstraps par giro.
+#    Kabhi toota bootstrap lekar APK nahi banta (script me verify hota hai).
+#  - Save: sirf tab jab bootstrap dobara bana ho (marker file
+#    .bootstrap-cache-hit NA ho). Cache HIT par kuch publish nahi hota.
+#  - Gradle deps cache (secondary, restore-keys ke saath).
+#  - cache-key-suffix input SIRF test ke liye hai (corrupt-cache test me
+#    alag key par toota asset rakhne ke liye); normal runs me khaali rakho.
+# Patch order, dispatch inputs, artifact names — sab original jaisa hai.
+# Cache MISS par behavior bilkul aaj jaisa hai (full build, koi fail nahi).
+
+name: Generate Termux application (cached test)
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      add:
+        description: "Include additional packages in bootstrap in a comma-separated list."
+        required: false
+      name:
+        description: "Specify TERMUX_APP__PACKAGE_NAME name."
+        required: false
+      user-path:
+        description: "Specify TERMUX_APP__USER_PATH path."
+        required: false
+      type:
+        description: "Specify the Termux project to fork [f-droid, play-store]. Defaults to f-droid."
+        required: false
+      architectures:
+        description: "Specify the bootstrap architectures to include in a comma-separated list [aarch64,arm,x86_64,i686]."
+        required: false
+      bootstrap-second-stage:
+        description: "Automatically execute termux-bootstrap-second-stage.sh."
+        required: false
+        type: boolean
+        default: true
+      ssh-server:
+        description: "Bundle an SSH server with the default password 'changeme'."
+        required: false
+        type: boolean
+      bootstrap:
+        description: "Build the bootstrap(s)."
+        required: false
+        type: boolean
+        default: true
+      terminal:
+        description: "Build the Terminal app."
+        required: false
+        type: boolean
+        default: true
+      tasker:
+        description: "Build the Tasker addon app."
+        required: false
+        type: boolean
+        default: true
+      float:
+        description: "Build the Float addon app."
+        required: false
+        type: boolean
+        default: true
+      widget:
+        description: "Build the Widget addon app."
+        required: false
+        type: boolean
+        default: true
+      api:
+        description: "Build the API addon app."
+        required: false
+        type: boolean
+        default: true
+      boot:
+        description: "Build the Boot addon app."
+        required: false
+        type: boolean
+        default: true
+      styling:
+        description: "Build the Styling addon app."
+        required: false
+        type: boolean
+        default: true
+      gui:
+        description: "Build the GUI addon app."
+        required: false
+        type: boolean
+        default: true
+      x11:
+        description: "Build the X11 addon app."
+        required: false
+        type: boolean
+        default: true
+      plugin:
+        description: "Specify plugin."
+        required: false
+      use-cached-bootstrap:
+        description: "Use cached bootstrap if available (else full build). Set false to force full build."
+        required: false
+        type: boolean
+        default: true
+      cache-key-suffix:
+        description: "TEST ONLY: suffix appended to the bootstrap cache key (e.g. -corrupt-test). Leave empty for normal runs."
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      # --- Cache key inputs (upstream SHAs, NOT generator branch head, NOT patch list) ---
+      # git ls-remote cheap hai (clone nahi). Upstream badla to key badlegi aur
+      # cache MISS hoga — ye sahi behavior hai (stale bootstrap nahi chalega).
+      - name: Compute bootstrap cache key inputs
+        id: bootstrap-key
+        run: |
+          PKG_SHA=$(git ls-remote https://github.com/termux/termux-packages HEAD | cut -f1)
+          APP_SHA=$(git ls-remote https://github.com/termux/termux-app HEAD | cut -f1)
+          echo "packages_sha=$PKG_SHA" >> $GITHUB_OUTPUT
+          echo "app_sha=$APP_SHA" >> $GITHUB_OUTPUT
+          # Generator ke bootstrap-patches ka hash: app patches (w10/w11/...)
+          # isme nahi aate, isliye app patch badalne par bhi key wahi rehti hai.
+          if [ -d f-droid-patches/bootstrap-patches ]; then
+            PATCH_HASH=$(find f-droid-patches/bootstrap-patches -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
+          else
+            PATCH_HASH=nopatches
+          fi
+          ADD_INPUT="${{ github.event.inputs.add }}"
+          PKG_LIST_HASH=$(printf 'xkeyboard-config,%s' "$ADD_INPUT" | sha256sum | cut -c1-8)
+          APP_NAME="${{ github.event.inputs.name }}"
+          [ -z "$APP_NAME" ] && APP_NAME="com.termux"
+          SUFFIX="${{ github.event.inputs.cache-key-suffix }}"
+          CACHE_KEY="bootstrap-aarch64-${PKG_SHA:0:12}-${APP_SHA:0:12}-${PATCH_HASH}-${PKG_LIST_HASH}-${APP_NAME}${SUFFIX}"
+          echo "cache_key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Bootstrap cache key: $CACHE_KEY"
+          echo "Upstream termux-packages HEAD: $PKG_SHA"
+          echo "Upstream termux-app HEAD: $APP_SHA"
+
+      # --- Bootstrap cache restore (PRIMARY: Release asset, tag bootstrap-cache-test) ---
+      # Release asset branch-scoped nahi hai, isliye koi bhi branch use kar sakta hai.
+      # Missing asset/tag = normal MISS (pehli run / upstream change) — fail mat karo.
+      # Asli sha verify script (use_cached_bootstrap) karta hai; yahan sirf download
+      # + manifest maujoodgi check hoti hai.
+      - name: Restore cached bootstrap (Release asset)
+        if: ${{ github.event.inputs.use-cached-bootstrap != 'false' }}
+        id: bootstrap-release
+        run: |
+          set +e
+          KEY="${{ steps.bootstrap-key.outputs.cache_key }}"
+          ASSET="${KEY}.tar.gz"
+          mkdir -p .bootstrap-cache
+          echo "Looking for bootstrap cache asset: $ASSET (tag bootstrap-cache-test)"
+          if gh release download bootstrap-cache-test -p "$ASSET" -D /tmp/bootstrap-dl 2>/tmp/bootstrap-dl.err; then
+            tar -xzf "/tmp/bootstrap-dl/$ASSET" -C .bootstrap-cache
+            if [ -f .bootstrap-cache/bootstrap-cache-manifest.txt ]; then
+              echo "bootstrap_hit=true" >> $GITHUB_OUTPUT
+              echo "Cache restored from Release asset: $ASSET"
+              ls -l .bootstrap-cache
+            else
+              echo "bootstrap_hit=false" >> $GITHUB_OUTPUT
+              echo "Cache asset had no manifest — treating as MISS, full build will run."
+              rm -rf .bootstrap-cache && mkdir -p .bootstrap-cache
+            fi
+          else
+            echo "bootstrap_hit=false" >> $GITHUB_OUTPUT
+            echo "Cache not found for key: $KEY (MISS — full build will run)"
+            cat /tmp/bootstrap-dl.err 2>/dev/null | head -5 || true
+          fi
+          set -e
+
+      - name: Restore Gradle dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches/modules-2
+          # Key me upstream app SHA + Gradle version; patch list NAHI (taaki har
+          # batch me HIT ho). Restore-keys prefix se upstream badalne par bhi
+          # purana cache milega, sirf nayi deps download hongi.
+          key: gradle-deps-${{ runner.os }}-${{ steps.bootstrap-key.outputs.app_sha }}-gradle-9
+          restore-keys: |
+            gradle-deps-${{ runner.os }}-
+
+      # --- Wahi Set --* steps (original workflow se, unchanged) ---
+      - name: Set --add
+        if: "${{ github.event.inputs.add != '' }}"
+        run: echo "ADDITIONAL_PACKAGES=--add ${{ github.event.inputs.add }}" >> $GITHUB_ENV
+      - name: Set --name
+        if: "${{ github.event.inputs.name != '' }}"
+        run: echo "TERMUX_APP__PACKAGE_NAME=--name ${{ github.event.inputs.name }}" >> $GITHUB_ENV
+      - name: Set --user-path
+        if: "${{ github.event.inputs.user-path != '' }}"
+        run: echo "TERMUX_APP__PACKAGE_NAME=--user-path ${{ github.event.inputs.user-path }}" >> $GITHUB_ENV
+      - name: Set --type
+        if: "${{ github.event.inputs.type != '' }}"
+        run: echo "TERMUX_APP_TYPE=--type ${{ github.event.inputs.type }}" >> $GITHUB_ENV
+      - name: Set --architectures
+        if: "${{ github.event.inputs.architectures != '' }}"
+        run: echo "BOOTSTRAP_ARCHITECTURES=--architectures ${{ github.event.inputs.architectures }}" >> $GITHUB_ENV
+      - name: Set --disable-bootstrap-second-stage
+        if: "${{ github.event.inputs.bootstrap-second-stage == 'false' }}"
+        run: echo "DISABLE_BOOTSTRAP_SECOND_STAGE=--disable-bootstrap-second-stage" >> $GITHUB_ENV
+      - name: Set --enable-ssh-server
+        if: "${{ github.event.inputs.ssh-server == 'true' }}"
+        run: echo "ENABLE_SSH_SERVER=--enable-ssh-server" >> $GITHUB_ENV
+      - name: Set --disable-bootstrap
+        if: "${{ github.event.inputs.bootstrap == 'false' }}"
+        run: echo "DISABLE_BOOTSTRAP=--disable-bootstrap" >> $GITHUB_ENV
+      - name: Set --disable-terminal
+        if: "${{ github.event.inputs.terminal == 'false' }}"
+        run: echo "DISABLE_TERMINAL=--disable-terminal" >> $GITHUB_ENV
+      - name: Set --disable-tasker
+        if: "${{ github.event.inputs.tasker == 'false' }}"
+        run: echo "DISABLE_TASKER=--disable-tasker" >> $GITHUB_ENV
+      - name: Set --disable-float
+        if: "${{ github.event.inputs.float == 'false' }}"
+        run: echo "DISABLE_FLOAT=--disable-float" >> $GITHUB_ENV
+      - name: Set --disable-widget
+        if: "${{ github.event.inputs.widget == 'false' }}"
+        run: echo "DISABLE_WIDGET=--disable-widget" >> $GITHUB_ENV
+      - name: Set --disable-api
+        if: "${{ github.event.inputs.api == 'false' }}"
+        run: echo "DISABLE_API=--disable-api" >> $GITHUB_ENV
+      - name: Set --disable-boot
+        if: "${{ github.event.inputs.boot == 'false' }}"
+        run: echo "DISABLE_BOOT=--disable-boot" >> $GITHUB_ENV
+      - name: Set --disable-styling
+        if: "${{ github.event.inputs.styling == 'false' }}"
+        run: echo "DISABLE_STYLING=--disable-styling" >> $GITHUB_ENV
+      - name: Set --disable-gui
+        if: "${{ github.event.inputs.gui == 'false' }}"
+        run: echo "DISABLE_GUI=--disable-gui" >> $GITHUB_ENV
+      - name: Set --disable-x11
+        if: "${{ github.event.inputs.x11 == 'false' }}"
+        run: echo "DISABLE_X11=--disable-x11" >> $GITHUB_ENV
+      - name: Set --plugin
+        if: "${{ github.event.inputs.plugin != '' }}"
+        run: echo "PLUGIN=--plugin ${{ github.event.inputs.plugin }}" >> $GITHUB_ENV
+
+      # --- Build Termux (script-side cached-bootstrap flag ke saath) ---
+      # TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR me sha-verified cache milne par
+      # script build_bootstraps skip karta hai; na mile/mismatch ho to full build.
+      - name: Build Termux
+        run: |
+          echo "Bootstrap cache key: ${{ steps.bootstrap-key.outputs.cache_key }}"
+          echo "Bootstrap release hit: ${{ steps.bootstrap-release.outputs.bootstrap_hit }}"
+          TERMUX_GENERATOR_CACHED_BOOTSTRAP_DIR="$PWD/.bootstrap-cache" ./build-termux.sh \
+                $ADDITIONAL_PACKAGES \
+                $TERMUX_APP__PACKAGE_NAME \
+                $TERMUX_APP_TYPE \
+                $BOOTSTRAP_ARCHITECTURES \
+                $DISABLE_BOOTSTRAP_SECOND_STAGE \
+                $ENABLE_SSH_SERVER \
+                $DISABLE_BOOTSTRAP \
+                $DISABLE_TERMINAL \
+                $DISABLE_TASKER \
+                $DISABLE_FLOAT \
+                $DISABLE_WIDGET \
+                $DISABLE_API \
+                $DISABLE_BOOT \
+                $DISABLE_STYLING \
+                $DISABLE_GUI \
+                $DISABLE_X11 \
+                $PLUGIN
+          echo "--- APK assets bootstrap check (cache proof) ---"
+          ls -l termux-apps-main/termux-app/app/src/main/assets/ 2>/dev/null | grep -E 'bootstrap|xz-' || echo "No bootstrap files in assets dir"
+          sha256sum termux-apps-main/termux-app/app/src/main/assets/bootstrap-*.zip termux-apps-main/termux-app/app/src/main/assets/xz-* 2>/dev/null || true
+
+      # --- Bootstrap cache save (sirf jab bootstrap dobara bana ho) ---
+      # Marker file .bootstrap-cache-hit script tabhi banata hai jab cached
+      # bootstrap use hua ho. Marker ho to publish skip karo (dobara upload
+      # ka koi matlab nahi — content wahi hai). Marker na ho aur assets me
+      # bootstrap files hon to tarball + manifest banao aur Release asset
+      # ke roop me publish karo (--clobber: wahi key dobara aaye to overwrite).
+      - name: Save bootstrap cache (only if rebuilt)
+        if: success()
+        run: |
+          set -e
+          if [ -f .bootstrap-cache-hit ]; then
+            echo "Bootstrap was cached — nothing to publish."
+            exit 0
+          fi
+          ASSETS="termux-apps-main/termux-app/app/src/main/assets"
+          if ! ls "$ASSETS"/bootstrap-*.zip "$ASSETS"/xz-* >/dev/null 2>&1; then
+            echo "No bootstrap files in assets dir — nothing to publish."
+            exit 0
+          fi
+          KEY="${{ steps.bootstrap-key.outputs.cache_key }}"
+          ASSET="${KEY}.tar.gz"
+          cd "$ASSETS"
+          sha256sum bootstrap-*.zip xz-* > bootstrap-cache-manifest.txt
+          cat bootstrap-cache-manifest.txt
+          tar -czf "/tmp/$ASSET" bootstrap-*.zip xz-* bootstrap-cache-manifest.txt
+          ls -l "/tmp/$ASSET"
+          cd "$GITHUB_WORKSPACE"
+          gh release create bootstrap-cache-test --target "$GITHUB_SHA" --title "Bootstrap cache (test)" --notes "Cached bootstrap outputs, content-addressed by upstream SHAs. Test tag for cache-test runs." 2>/dev/null || true
+          gh release upload bootstrap-cache-test "/tmp/$ASSET" --clobber
+          echo "Published bootstrap cache asset: $ASSET"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: Termux APKs or bootstraps
+          path: |
+            ./*.apk
+            ./*.zip
+            ./*.xz
