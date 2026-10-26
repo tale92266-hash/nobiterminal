@@ -1,0 +1,295 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+@@ -36,7 +36,6 @@
+ import com.termux.shared.termux.TermuxConstants;
+ import com.termux.shared.termux.TermuxUtils;
+ import com.termux.shared.activity.media.AppCompatActivityUtils;
+-import com.termux.shared.theme.NightMode;
+ 
+ public class SettingsActivity extends AppCompatActivity {
+ 
+@@ -44,16 +43,11 @@
+     protected void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+ 
+-        // v15: follow the Nobi time-aware terminal theme for the Settings UI.
+-        // v15: when the time-theme pref is on, derive the local night mode from
+-        // v15: the applied terminal theme (daylight -> light, dark -> dark);
+-        // v15: when it is off, upstream behavior (NightMode property/system) is kept.
+-        int nobiNightMode = nobiDesiredNightMode();
+-        if (nobiNightMode != -1) {
+-            getDelegate().setLocalNightMode(nobiNightMode);
+-        } else {
+-            AppCompatActivityUtils.setNightMode(this, NightMode.getAppNightMode().getName(), true);
+-        }
++        // v16: Settings always follows the terminal's actual colors (see
++        // v16: nobiDesiredNightMode). The mode is always determined, so the
++        // v16: old upstream fallback (NightMode property/system) is gone: it
++        // v16: is exactly what let Settings drift from the terminal.
++        getDelegate().setLocalNightMode(nobiDesiredNightMode());
+ 
+         setContentView(R.layout.activity_settings);
+         if (savedInstanceState == null) {
+@@ -70,30 +64,85 @@
+     @Override
+     protected void onResume() {
+         super.onResume();
+-        // v15: re-apply the Nobi terminal theme if it changed while Settings was open.
++        // v16: re-apply the terminal theme if it changed while Settings was open.
+         int nobiNightMode = nobiDesiredNightMode();
+-        if (nobiNightMode != -1 && getDelegate().getLocalNightMode() != nobiNightMode) {
++        if (getDelegate().getLocalNightMode() != nobiNightMode) {
+             getDelegate().setLocalNightMode(nobiNightMode);
+         }
+     }
+ 
+     /**
+-     * v15: night mode following the Nobi time-aware terminal theme, or -1
+-     * when the time-theme pref is off (caller then keeps upstream behavior).
+-     * Reads the same nobi_v7 prefs TermuxActivity uses; prefers the theme the
+-     * terminal actually applied, falling back to the current-hour rule.
++     * v16: night mode following the terminal's ACTUAL colors, in every case.
++     * v16: w15 only followed the time-theme pref, but a manual theme pick in
++     * v16: Nobi Settings writes colors.properties and never touches the
++     * v16: nobi_v7 prefs, so Settings kept following the stale time-theme
++     * v16: value. Signal order: (1) ~/.termux/colors.properties background
++     * v16: luminance (the same file the terminal itself reads, so manual
++     * v16: picks, time-theme, and hand edits all agree); (2) no colors file
++     * v16: means the "default" theme, whose stock terminal is dark; (3) a
++     * v16: missing/unparseable background falls back to the last time-theme
++     * v16: value, then the hour rule. Never returns -1, so the caller always
++     * v16: sets a mode and Settings cannot drift from the terminal.
++     * v16: Only a tiny properties file is read here (no heavy work on the
++     * v16: UI thread); a broken file never throws, it just falls back.
+      */
+     private int nobiDesiredNightMode() {
++        java.io.File colorsFile = TermuxConstants.TERMUX_COLOR_PROPERTIES_FILE;
++        if (!colorsFile.isFile()) {
++            // v16: "default" theme deletes colors.properties; stock terminal is dark.
++            return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
++        }
++        String background = nobiTerminalBackground(colorsFile);
++        if (background != null) {
++            int luminance = nobiColorLuminance(background);
++            if (luminance >= 0) {
++                return luminance >= 128 ? androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
++                        : androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
++            }
++        }
+         android.content.SharedPreferences prefs = getSharedPreferences("nobi_v7", MODE_PRIVATE);
+-        if (!prefs.getBoolean("time_theme", false)) return -1;
+         String wanted = prefs.getString("time_theme_applied", "");
+         if (wanted == null || wanted.isEmpty()) {
+             int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+             wanted = (hour >= 7 && hour < 19) ? "daylight" : "dark";
+         }
+         if ("daylight".equals(wanted)) return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO;
+-        if ("dark".equals(wanted)) return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
+-        return -1;
++        return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
++    }
++
++    /**
++     * v16: "background=" value from the terminal colors file, or null when
++     * v16: the file cannot be read or has no background key. Never throws: a
++     * v16: broken colors file must not break Settings, the caller falls back.
++     */
++    private String nobiTerminalBackground(java.io.File colorsFile) {
++        java.util.Properties props = new java.util.Properties();
++        try (java.io.InputStream in = new java.io.FileInputStream(colorsFile)) {
++            props.load(in);
++        } catch (Exception e) {
++            return null;
++        }
++        String background = props.getProperty("background");
++        return (background == null || background.trim().isEmpty()) ? null : background.trim();
++    }
++
++    /**
++     * v16: perceived luminance of a #RRGGBB or #AARRGGBB color (0-255), or -1
++     * v16: when it cannot be parsed. Threshold 128 in the caller: daylight
++     * v16: white (#FFFFFF) is 255, every shipped dark theme is below 60.
++     */
++    private int nobiColorLuminance(String color) {
++        String hex = color.startsWith("#") ? color.substring(1) : color;
++        try {
++            if (hex.length() == 8) hex = hex.substring(2);
++            if (hex.length() != 6) return -1;
++            int r = Integer.parseInt(hex.substring(0, 2), 16);
++            int g = Integer.parseInt(hex.substring(2, 4), 16);
++            int b = Integer.parseInt(hex.substring(4, 6), 16);
++            return (2126 * r + 7152 * g + 722 * b) / 10000;
++        } catch (NumberFormatException e) {
++            return -1;
++        }
+     }
+ 
+     @Override
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+@@ -50,10 +50,11 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        // v15: follow the Nobi time-aware terminal theme for editor Settings UI.
+-        // v15: (Theme.NobiCode is fixed-dark, so this bridge takes visible effect
+-        // v15: only if that theme ever becomes DayNight; it is harmless until then.)
+-        nobiDesiredNightMode()?.let { delegate.localNightMode = it }
++        // v16: editor Settings follows the terminal's actual colors, same
++        // v16: signal as main Settings (see nobiDesiredNightMode). The theme
++        // v16: parent is now Theme.NobiCode.DayNight (manifest), so this call
++        // v16: finally takes visible effect instead of being a fixed-dark no-op.
++        delegate.localNightMode = nobiDesiredNightMode()
+         binding = NobicActivitySettingsBinding.inflate(layoutInflater)
+         setContentView(binding.root)
+         prefs = EditorPreferences(this)
+@@ -95,28 +96,79 @@
+ 
+     override fun onResume() {
+         super.onResume()
+-        // v15: re-apply the Nobi terminal theme if it changed while Settings was open.
+-        nobiDesiredNightMode()?.let { mode ->
+-            if (delegate.localNightMode != mode) delegate.localNightMode = mode
+-        }
++        // v16: re-apply the terminal theme if it changed while Settings was open.
++        val mode = nobiDesiredNightMode()
++        if (delegate.localNightMode != mode) delegate.localNightMode = mode
+     }
+ 
+     /**
+-     * v15: night mode following the Nobi time-aware terminal theme, or null
+-     * when the time-theme pref is off (upstream behavior is then kept).
++     * v16: night mode following the terminal's ACTUAL colors, in every case.
++     * v16: Same signal as main Settings: ~/.termux/colors.properties
++     * v16: background luminance (the file the terminal itself reads), so a
++     * v16: manual theme pick, time-theme, and hand edits all agree. The
++     * v16: nobicode module does not depend on termux-shared, so the path is
++     * v16: built from filesDir instead of TermuxConstants (same file: the
++     * v16: app's files/home/.termux/colors.properties). No colors file means
++     * v16: the "default" theme, whose stock terminal is dark; a missing or
++     * v16: unparseable background falls back to the last time-theme value,
++     * v16: then the hour rule. Never null: the caller always sets a mode.
++     * v16: Only a tiny properties file is read here; a broken file never
++     * v16: throws, it just falls back.
+      */
+-    private fun nobiDesiredNightMode(): Int? {
++    private fun nobiDesiredNightMode(): Int {
++        val colorsFile = java.io.File(filesDir, "home/.termux/colors.properties")
++        if (!colorsFile.isFile) {
++            // v16: "default" theme deletes colors.properties; stock terminal is dark.
++            return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
++        }
++        val background = nobiTerminalBackground(colorsFile)
++        if (background != null) {
++            val luminance = nobiColorLuminance(background)
++            if (luminance >= 0) {
++                return if (luminance >= 128) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
++                else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
++            }
++        }
+         val prefs = getSharedPreferences("nobi_v7", MODE_PRIVATE)
+-        if (!prefs.getBoolean("time_theme", false)) return null
+         var wanted = prefs.getString("time_theme_applied", "") ?: ""
+         if (wanted.isEmpty()) {
+             val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+             wanted = if (hour >= 7 && hour < 19) "daylight" else "dark"
+         }
+-        return when (wanted) {
+-            "daylight" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+-            "dark" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+-            else -> null
++        return if (wanted == "daylight") androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
++        else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
++    }
++
++    /**
++     * v16: "background=" value from the terminal colors file, or null when
++     * v16: the file cannot be read or has no background key. Never throws.
++     */
++    private fun nobiTerminalBackground(colorsFile: java.io.File): String? {
++        return try {
++            val props = java.util.Properties()
++            colorsFile.inputStream().use { props.load(it) }
++            props.getProperty("background")?.trim()?.takeIf { it.isNotEmpty() }
++        } catch (e: Exception) {
++            null
++        }
++    }
++
++    /**
++     * v16: perceived luminance of a #RRGGBB or #AARRGGBB color (0-255), or -1
++     * v16: when it cannot be parsed. Threshold 128 in the caller: daylight
++     * v16: white (#FFFFFF) is 255, every shipped dark theme is below 60.
++     */
++    private fun nobiColorLuminance(color: String): Int {
++        var hex = if (color.startsWith("#")) color.substring(1) else color
++        return try {
++            if (hex.length == 8) hex = hex.substring(2)
++            if (hex.length != 6) return -1
++            val r = hex.substring(0, 2).toInt(16)
++            val g = hex.substring(2, 4).toInt(16)
++            val b = hex.substring(4, 6).toInt(16)
++            (2126 * r + 7152 * g + 722 * b) / 10000
++        } catch (e: NumberFormatException) {
++            -1
+         }
+     }
+ 
+diff --git a/termux-app/nobicode/src/main/res/values/themes.xml b/termux-app/nobicode/src/main/res/values/themes.xml
+--- a/termux-app/nobicode/src/main/res/values/themes.xml
++++ b/termux-app/nobicode/src/main/res/values/themes.xml
+@@ -15,6 +15,14 @@
+         <item name="android:navigationBarColor">@color/surface_container_low</item>
+     </style>
+ 
++    <!-- v16: DayNight twin of Theme.NobiCode, used ONLY by SettingsActivity.
++         Light mode intentionally carries no color items (stock Material3
++         light palette); the night override in values-night/themes.xml
++         repeats Theme.NobiCode's dark items, so dark mode looks exactly as
++         it did before. Other activities keep fixed-dark Theme.NobiCode, and
++         no color value was invented for this. -->
++    <style name="Theme.NobiCode.DayNight" parent="Theme.Material3.DayNight.NoActionBar" />
++
+     <!-- Fullscreen terminal theme - no status bar like Termux -->
+     <style name="Theme.Terminal.Fullscreen" parent="Theme.Material3.Dark.NoActionBar">
+         <item name="android:windowFullscreen">true</item>
+diff --git a/termux-app/nobicode/src/main/AndroidManifest.xml b/termux-app/nobicode/src/main/AndroidManifest.xml
+--- a/termux-app/nobicode/src/main/AndroidManifest.xml
++++ b/termux-app/nobicode/src/main/AndroidManifest.xml
+@@ -49,7 +49,7 @@
+             android:name=".SettingsActivity"
+             android:exported="false"
+             android:label="Settings"
+-            android:theme="@style/Theme.NobiCode" />
++            android:theme="@style/Theme.NobiCode.DayNight" />
+ 
+         <activity
+             android:name=".ProjectManagerActivity"
+diff --git a/termux-app/nobicode/src/main/res/values-night/themes.xml b/termux-app/nobicode/src/main/res/values-night/themes.xml
+--- /dev/null
++++ b/termux-app/nobicode/src/main/res/values-night/themes.xml
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- v16: night half of Theme.NobiCode.DayNight. These items are an exact
++         copy of Theme.NobiCode's dark items, so editor Settings in dark mode
++         looks identical to before; light mode uses the day half in
++         values/themes.xml (stock Material3 light palette, no invented
++         colors). Only SettingsActivity uses this theme. -->
++    <style name="Theme.NobiCode.DayNight" parent="Theme.Material3.DayNight.NoActionBar">
++        <item name="colorPrimary">@color/primary</item>
++        <item name="colorOnPrimary">@color/on_primary</item>
++        <item name="colorPrimaryContainer">@color/primary_container</item>
++        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
++        <item name="colorSurface">@color/surface</item>
++        <item name="colorOnSurface">@color/on_surface</item>
++        <item name="colorSurfaceContainerLow">@color/surface_container_low</item>
++        <item name="colorSurfaceContainerHigh">@color/surface_container_high</item>
++        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
++        <item name="colorOutlineVariant">@color/outline_variant</item>
++        <item name="android:statusBarColor">@color/surface_container_low</item>
++        <item name="android:navigationBarColor">@color/surface_container_low</item>
++    </style>
++</resources>
