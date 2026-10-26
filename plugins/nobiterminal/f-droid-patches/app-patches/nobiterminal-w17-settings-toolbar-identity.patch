@@ -1,0 +1,60 @@
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -14,6 +14,24 @@
+     <!-- TermuxApp DayNight NoActionBar theme. -->
+     <style name="Theme.TermuxApp.DayNight.NoActionBar" parent="Theme.BaseActivity.DayNight.NoActionBar"/>
+ 
++    <!-- v17: Settings-only identity theme. Upstream BaseActivity paints the
++         v17: Settings toolbar/status bar bright red (colorPrimary red_400
++         v17: #FF0000, variant red_800 #C4001D) in BOTH modes, which clashes
++         v17: with the Nobi navy+cyan identity. This override is used ONLY by
++         v17: SettingsActivity (manifest); other activities keep the shared
++         v17: theme untouched. Same navy in both modes: the toolbar is brand
++         v17: chrome, not body, and white title text works on navy day+night.
++         v17: w16 light/dark body follow is untouched (delegate night mode). -->
++    <style name="Theme.NobiSettings.DayNight" parent="Theme.TermuxApp.DayNight.NoActionBar">
++        <!-- Drawer/tabs navy (app colors.xml): toolbar + status bar + any
++             primary-tinted control in Settings. -->
++        <item name="colorPrimary">@color/nobi_navy</item>
++        <item name="colorPrimaryVariant">@color/nobi_navy</item>
++        <item name="colorPrimaryDark">@color/nobi_navy</item>
++        <item name="colorOnPrimary">@color/white</item>
++        <item name="android:statusBarColor">@color/nobi_navy</item>
++    </style>
++
+ 
+     <!-- TermuxActivity DayNight NoActionBar theme. -->
+     <style name="Theme.TermuxActivity.DayNight.NoActionBar" parent="Theme.TermuxApp.DayNight.NoActionBar">
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -157,7 +157,7 @@
+             android:name=".app.activities.SettingsActivity"
+             android:exported="true"
+             android:label="@string/title_activity_termux_settings"
+-            android:theme="@style/Theme.TermuxApp.DayNight.NoActionBar" />
++            android:theme="@style/Theme.NobiSettings.DayNight" />
+ 
+         <activity
+             android:name=".shared.activities.ReportActivity"
+diff --git a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+@@ -59,6 +59,16 @@
+ 
+         AppCompatActivityUtils.setToolbar(this, com.termux.shared.R.id.toolbar);
+         AppCompatActivityUtils.setShowBackButtonInActionBar(this, true);
++
++        // v17: title + back arrow stay white on the navy toolbar in BOTH
++        // v17: modes. The DayNight action-bar overlay would otherwise give
++        // v17: dark text/icons in day mode, unreadable on navy.
++        androidx.appcompat.widget.Toolbar toolbar = findViewById(com.termux.shared.R.id.toolbar);
++        if (toolbar != null) {
++            toolbar.setTitleTextColor(android.graphics.Color.WHITE);
++            android.graphics.drawable.Drawable navIcon = toolbar.getNavigationIcon();
++            if (navIcon != null) navIcon.mutate().setTint(android.graphics.Color.WHITE);
++        }
+     }
+ 
+     @Override
