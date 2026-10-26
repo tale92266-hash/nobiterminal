@@ -217,6 +217,7 @@ if [ -z "${DO_NOT_CLEAN}" ]; then
     fi
     patch_bootstraps
     patch_apps
+    remove_dead_nobi_assets
     if [ -z "${DISABLE_X11}" ]; then
         build_termux_x11
         move_termux_x11_deb
