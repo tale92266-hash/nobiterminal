@@ -1,0 +1,78 @@
+diff -ruN snap1/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt snap2/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+@@ -1908,6 +1908,7 @@
+         val roInfo = if (prefs.readOnly) " \u2022 Read-only" else ""
+         val followupEnc = FollowupStore.encodingFor(this, openTabs.getOrNull(activeTabIndex)?.uri?.toString())
+         binding.statusEncoding.text = "$followupEnc \u2022 $le \u2022 $indentInfo$roInfo"
++        refreshFileBreadcrumb()
+     }
+ 
+     private fun updateEmptyState() {
+@@ -5227,6 +5228,25 @@
+         }
+     }
+ 
++    /** w22: file line above the editor — short path • language • encoding • line ending. */
++    private fun refreshFileBreadcrumb() {
++        val line = binding.fileBreadcrumb
++        if (activeTabIndex !in openTabs.indices) {
++            line.visibility = View.GONE
++            return
++        }
++        val tab = openTabs[activeTabIndex]
++        val dir = shortPathForTab(tab)
++        val filePart = if (dir.isEmpty()) tab.name else "$dir/${tab.name}"
++        val lang = FileIconProvider.getLanguageName(tab.name)
++        val enc = FollowupStore.encodingFor(this, tab.uri?.toString())
++        val t = binding.editor.text
++        val le = if (t != null && t.contains("\r\n")) "CRLF" else "LF"
++        line.text = "$filePart • $lang • $enc • $le"
++        line.setTextColor(android.graphics.Color.parseColor("#CC22D3EE"))
++        line.visibility = View.VISIBLE
++    }
++
+     /** Breadcrumb strip: file > class > function — tap karne par us symbol par jump. */
+     private fun refreshBreadcrumbs() {
+         val scroll = binding.breadcrumbScroll
+@@ -5272,6 +5292,7 @@
+             addCrumb(sym.name, idx == crumbs.lastIndex) { pushNavPoint(); binding.editor.gotoLine(sym.line) }
+         }
+         scroll.post { scroll.fullScroll(View.FOCUS_RIGHT) }
++        refreshFileBreadcrumb()
+     }
+ 
+     private var zenMode: Boolean = false
+@@ -5304,6 +5325,7 @@
+             binding.appBar.visibility = View.GONE
+             binding.tabScroll.visibility = View.GONE
+             binding.breadcrumbScroll.visibility = View.GONE
++            binding.fileBreadcrumb.visibility = View.GONE
+             binding.symbolsBar.visibility = View.GONE
+             binding.footerBar.visibility = View.GONE
+             binding.statusBar.visibility = View.GONE
+diff -ruN snap1/termux-app/nobicode/src/main/res/layout/activity_main.xml snap2/termux-app/nobicode/src/main/res/layout/activity_main.xml
+--- a/termux-app/nobicode/src/main/res/layout/activity_main.xml
++++ b/termux-app/nobicode/src/main/res/layout/activity_main.xml
+@@ -60,6 +60,21 @@
+             android:background="?attr/colorOutlineVariant"
+             android:alpha="0.4" />
+ 
++        <!-- w22: file line — short path • language • encoding • line ending, one line -->
++        <TextView
++            android:id="@+id/fileBreadcrumb"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:background="?attr/colorSurface"
++            android:ellipsize="end"
++            android:maxLines="1"
++            android:paddingStart="14dp"
++            android:paddingEnd="12dp"
++            android:paddingTop="2dp"
++            android:paddingBottom="2dp"
++            android:textColor="?attr/colorOnSurfaceVariant"
++            android:textSize="12sp" />
++
+         <!-- Breadcrumb navigation strip -->
+         <HorizontalScrollView
+             android:id="@+id/breadcrumbScroll"

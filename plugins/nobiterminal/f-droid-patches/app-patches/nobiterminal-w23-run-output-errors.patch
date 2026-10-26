@@ -1,0 +1,43 @@
+diff -ruN snap2/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt snap3/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+@@ -113,6 +113,8 @@
+ import com.nobidev.nobicode.history.LocalHistory
+ import android.graphics.Typeface
+ import android.text.SpannableString
++import android.text.SpannableStringBuilder
++import android.text.Spanned
+ import android.text.style.ForegroundColorSpan
+ import com.nobidev.nobicode.remote.RemoteSheet
+ 
+@@ -599,7 +601,29 @@
+             return
+         }
+         lastShownOutputMtime = file.lastModified()
+-        textView.text = lines.takeLast(40).joinToString("\n")
++        // w23: error lines get the existing error token (accent_dot) plus a short
++        // recovery hint; detection is a plain-substring heuristic, not a parser.
++        val shown = lines.takeLast(40)
++        val errorColor = android.graphics.Color.parseColor("#FF6B8A")
++        val hintColor = android.graphics.Color.parseColor("#22D3EE")
++        val sb = SpannableStringBuilder()
++        var hasError = false
++        for ((idx, ln) in shown.withIndex()) {
++            if (idx > 0) sb.append("\n")
++            val start = sb.length
++            sb.append(ln)
++            val lower = ln.lowercase()
++            if (lower.contains("traceback") || lower.contains("error") || lower.contains("exception") || lower.contains("failed") || lower.contains("fatal")) {
++                hasError = true
++                sb.setSpan(ForegroundColorSpan(errorColor), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++            }
++        }
++        if (hasError) {
++            val hintStart = sb.length
++            sb.append("\nErrors detected — open Terminal for full output")
++            sb.setSpan(ForegroundColorSpan(hintColor), hintStart, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++        }
++        textView.text = sb
+         // v7 (85): glass look — translucent rounded strip instead of flat fill.
+         if (prefs.glassLook) {
+             val bg = android.graphics.drawable.GradientDrawable()
