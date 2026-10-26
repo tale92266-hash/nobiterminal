@@ -1,0 +1,110 @@
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -952,6 +952,8 @@
+     // ---- v7 (66/67/68): quick exit ----
+ 
+     private void showNobiExitDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         boolean serverRunning = false;
+         try {
+             for (com.termux.shared.termux.shell.command.runner.terminal.TermuxSession ts :
+@@ -1093,6 +1095,8 @@
+     }
+ 
+     private void assignNobiGroup(TerminalSession session) {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final String[] groups = new String[]{"Work", "Server", "Personal",
+             getString(R.string.nobi_group_clear)};
+         new AlertDialog.Builder(this)
+@@ -1514,6 +1518,8 @@
+             Toast.makeText(this, R.string.nobi_no_sessions, Toast.LENGTH_SHORT).show();
+             return;
+         }
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final String[] labels = new String[]{
+             getString(R.string.nobi_font_follow_global), "12", "14", "16", "18", "20", "22", "24"};
+         new AlertDialog.Builder(this)
+@@ -1565,6 +1571,8 @@
+             });
+ 
+     private void showNobiTerminalFontDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final java.io.File fontFile = new java.io.File(
+             com.termux.shared.termux.TermuxConstants.TERMUX_HOME_DIR_PATH, ".termux/font.ttf");
+         final String[] labels = new String[]{
+@@ -1593,6 +1601,8 @@
+     // ---- v7 (71/84/87/85/81/83/88): terminal chrome prefs ----
+ 
+     private void showNobiTabStyleDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final String[] keys = new String[]{"rounded", "underline", "dots"};
+         final String[] labels = new String[]{
+             getString(R.string.nobi_tab_style_rounded),
+@@ -1613,6 +1623,8 @@
+     }
+ 
+     private void showNobiAccentDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final String[] hexes = new String[]{"#22D3EE", "#8B5CF6", "#34D399", "#FBBF24",
+             "#F87171", "#F472B6", "#60A5FA"};
+         final String[] labels = new String[]{
+@@ -1637,6 +1649,8 @@
+     }
+ 
+     private void showNobiDensityDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final String[] keys = new String[]{"comfortable", "compact"};
+         final String[] labels = new String[]{
+             getString(R.string.nobi_density_comfortable),
+@@ -2174,6 +2188,8 @@
+     }
+ 
+     private void showQuickCommandsDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         final List<String> commands = new ArrayList<>(loadQuickCommands());
+         AlertDialog.Builder builder = new AlertDialog.Builder(this)
+             .setTitle(R.string.nobi_quick_commands_title)
+@@ -2218,6 +2234,8 @@
+     // region v6: session tools (notes, colours, startup commands, shortcut)
+ 
+     private void showSessionToolsDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         String[] items = new String[]{
+             getString(R.string.nobi_session_notes_title),
+             getString(R.string.nobi_tab_colours_title),
+@@ -2553,6 +2571,8 @@
+ 
+     // v6 (14): one tap to start a web or SSH server in its own session.
+     private void showServerDialog() {
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+         String[] items = new String[]{
+             getString(R.string.nobi_server_web),
+             getString(R.string.nobi_server_ssh)};
+@@ -2834,6 +2854,8 @@
+ 
+     private void showKillSessionDialog(TerminalSession session) {
+         if (session == null) return;
++        // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++        com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+ 
+         final AlertDialog.Builder b = new AlertDialog.Builder(this);
+         b.setIcon(android.R.drawable.ic_dialog_alert);
+@@ -2864,6 +2886,8 @@
+         } catch (ActivityNotFoundException | IllegalArgumentException e) {
+             // The startActivity() call is not documented to throw IllegalArgumentException.
+             // However, crash reporting shows that it sometimes does, so catch it here.
++            // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
++            com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+             new AlertDialog.Builder(this).setMessage(getString(R.string.error_styling_not_installed))
+                 .setPositiveButton(R.string.action_styling_install,
+                     (dialog, which) -> ActivityUtils.startActivity(this, new Intent(Intent.ACTION_VIEW, Uri.parse(TermuxConstants.TERMUX_STYLING_FDROID_PACKAGE_URL))))
