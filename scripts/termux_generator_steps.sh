@@ -403,3 +403,25 @@ move_apks() {
         done
     fi
 }
+
+# v13 cleanup (Sam ka order 2026-10-26): upstream Termux ke legacy launcher
+# PNGs + banner PNG APK me bake ho jate hain, jabki manifest ab Nobi vector
+# icon use karta hai aur in files ka kahin koi reference nahi hai. Patch
+# channel binary files delete nahi kar sakta, isliye Gradle se pehle yahan
+# seedha rm hota hai. rm -f: upstream se ye files gayab hon to bhi build
+# nahi tootega; post-check me koi bachi ho to build fail hoga (chupchaap
+# APK me wapas na aaye).
+remove_dead_nobi_assets() {
+    local res_dir="termux-apps-main/termux-app/app/src/main/res"
+    local density
+    for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+        rm -f "$res_dir/mipmap-$density/ic_launcher.png" \
+              "$res_dir/mipmap-$density/ic_launcher_round.png"
+    done
+    rm -f "$res_dir/drawable/banner.png"
+    if ls "$res_dir"/mipmap-*/ic_launcher.png "$res_dir"/mipmap-*/ic_launcher_round.png "$res_dir/drawable/banner.png" >/dev/null 2>&1; then
+        echo "ERROR: dead Nobi assets still present after removal - refusing to build with them."
+        exit 1
+    fi
+    echo "Dead Nobi assets removed (legacy launcher PNGs + banner.png)."
+}
