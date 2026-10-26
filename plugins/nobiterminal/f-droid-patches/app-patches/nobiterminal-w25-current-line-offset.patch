@@ -1,0 +1,14 @@
+diff -ruN v17/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt v18/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+@@ -1301,8 +1301,8 @@
+             val caret = selectionStart
+             if (l != null && caret == selectionEnd) {
+                 val line = l.getLineForOffset(caret.coerceIn(0, length()))
+-                val top = (scrollY + l.getLineTop(line)).toFloat()
+-                val bottom = (scrollY + l.getLineBottom(line)).toFloat()
++                val top = (paddingTop + l.getLineTop(line)).toFloat()
++                val bottom = (paddingTop + l.getLineBottom(line)).toFloat()
+                 val hlLeft = scrollX + if (showLineNumbers) gutterWidth else 0
+                 canvas.drawRect(hlLeft.toFloat(), top, (scrollX + width).toFloat(), bottom, highlightPaint)
+             }
