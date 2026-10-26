@@ -1,0 +1,153 @@
+diff --git a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java
+--- a/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java
++++ b/termux-app/termux-shared/src/main/java/com/termux/shared/termux/extrakeys/ExtraKeysView.java
+@@ -416,6 +416,9 @@
+ 
+                 button.setText(buttonInfo.getDisplay());
+                 button.setTextColor(mButtonTextColor);
++                // v15: resting background was never set (buttons started
++                // v15: transparent, showing the bar behind them) — set it explicitly.
++                button.setBackgroundColor(mButtonBackgroundColor);
+                 button.setAllCaps(mButtonTextAllCaps);
+                 button.setPadding(0, 0, 0, 0);
+ 
+@@ -428,6 +431,7 @@
+                     switch (event.getAction()) {
+                         case MotionEvent.ACTION_DOWN:
+                             view.setBackgroundColor(mButtonActiveBackgroundColor);
++                            button.setTextColor(mButtonActiveTextColor);
+                             // Start long press scheduled executors which will be stopped in next MotionEvent
+                             startScheduledExecutors(view, buttonInfo, button);
+                             return true;
+@@ -438,10 +442,12 @@
+                                 if (mPopupWindow == null && event.getY() < 0) {
+                                     stopScheduledExecutors();
+                                     view.setBackgroundColor(mButtonBackgroundColor);
++                                    button.setTextColor(mButtonTextColor);
+                                     showPopup(view, buttonInfo.getPopup());
+                                 }
+                                 if (mPopupWindow != null && event.getY() > 0) {
+                                     view.setBackgroundColor(mButtonActiveBackgroundColor);
++                                    button.setTextColor(mButtonActiveTextColor);
+                                     dismissPopup();
+                                 }
+                             }
+@@ -449,11 +455,13 @@
+ 
+                         case MotionEvent.ACTION_CANCEL:
+                             view.setBackgroundColor(mButtonBackgroundColor);
++                            button.setTextColor(mButtonTextColor);
+                             stopScheduledExecutors();
+                             return true;
+ 
+                         case MotionEvent.ACTION_UP:
+                             view.setBackgroundColor(mButtonBackgroundColor);
++                            button.setTextColor(mButtonTextColor);
+                             stopScheduledExecutors();
+                             // If ACTION_UP up was not from a repetitive key or was with a key with a popup button
+                             if (mLongPressCount == 0 || mPopupWindow != null) {
+diff --git a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+@@ -44,7 +44,16 @@
+     protected void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+ 
+-        AppCompatActivityUtils.setNightMode(this, NightMode.getAppNightMode().getName(), true);
++        // v15: follow the Nobi time-aware terminal theme for the Settings UI.
++        // v15: when the time-theme pref is on, derive the local night mode from
++        // v15: the applied terminal theme (daylight -> light, dark -> dark);
++        // v15: when it is off, upstream behavior (NightMode property/system) is kept.
++        int nobiNightMode = nobiDesiredNightMode();
++        if (nobiNightMode != -1) {
++            getDelegate().setLocalNightMode(nobiNightMode);
++        } else {
++            AppCompatActivityUtils.setNightMode(this, NightMode.getAppNightMode().getName(), true);
++        }
+ 
+         setContentView(R.layout.activity_settings);
+         if (savedInstanceState == null) {
+@@ -59,6 +68,35 @@
+     }
+ 
+     @Override
++    protected void onResume() {
++        super.onResume();
++        // v15: re-apply the Nobi terminal theme if it changed while Settings was open.
++        int nobiNightMode = nobiDesiredNightMode();
++        if (nobiNightMode != -1 && getDelegate().getLocalNightMode() != nobiNightMode) {
++            getDelegate().setLocalNightMode(nobiNightMode);
++        }
++    }
++
++    /**
++     * v15: night mode following the Nobi time-aware terminal theme, or -1
++     * when the time-theme pref is off (caller then keeps upstream behavior).
++     * Reads the same nobi_v7 prefs TermuxActivity uses; prefers the theme the
++     * terminal actually applied, falling back to the current-hour rule.
++     */
++    private int nobiDesiredNightMode() {
++        android.content.SharedPreferences prefs = getSharedPreferences("nobi_v7", MODE_PRIVATE);
++        if (!prefs.getBoolean("time_theme", false)) return -1;
++        String wanted = prefs.getString("time_theme_applied", "");
++        if (wanted == null || wanted.isEmpty()) {
++            int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
++            wanted = (hour >= 7 && hour < 19) ? "daylight" : "dark";
++        }
++        if ("daylight".equals(wanted)) return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO;
++        if ("dark".equals(wanted)) return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
++        return -1;
++    }
++
++    @Override
+     public boolean onSupportNavigateUp() {
+         onBackPressed();
+         return true;
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/SettingsActivity.kt
+@@ -50,6 +50,10 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
++        // v15: follow the Nobi time-aware terminal theme for editor Settings UI.
++        // v15: (Theme.NobiCode is fixed-dark, so this bridge takes visible effect
++        // v15: only if that theme ever becomes DayNight; it is harmless until then.)
++        nobiDesiredNightMode()?.let { delegate.localNightMode = it }
+         binding = NobicActivitySettingsBinding.inflate(layoutInflater)
+         setContentView(binding.root)
+         prefs = EditorPreferences(this)
+@@ -89,6 +93,33 @@
+         }
+     }
+ 
++    override fun onResume() {
++        super.onResume()
++        // v15: re-apply the Nobi terminal theme if it changed while Settings was open.
++        nobiDesiredNightMode()?.let { mode ->
++            if (delegate.localNightMode != mode) delegate.localNightMode = mode
++        }
++    }
++
++    /**
++     * v15: night mode following the Nobi time-aware terminal theme, or null
++     * when the time-theme pref is off (upstream behavior is then kept).
++     */
++    private fun nobiDesiredNightMode(): Int? {
++        val prefs = getSharedPreferences("nobi_v7", MODE_PRIVATE)
++        if (!prefs.getBoolean("time_theme", false)) return null
++        var wanted = prefs.getString("time_theme_applied", "") ?: ""
++        if (wanted.isEmpty()) {
++            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
++            wanted = if (hour >= 7 && hour < 19) "daylight" else "dark"
++        }
++        return when (wanted) {
++            "daylight" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
++            "dark" -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
++            else -> null
++        }
++    }
++
+     private fun setupSettingsSearch() {
+         binding.settingsSearch.addTextChangedListener(object : TextWatcher {
+             override fun afterTextChanged(s: Editable?) {
