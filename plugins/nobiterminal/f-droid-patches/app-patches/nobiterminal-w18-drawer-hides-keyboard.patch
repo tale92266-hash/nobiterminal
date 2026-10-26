@@ -1,0 +1,37 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java b/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/io/TermuxTerminalExtraKeys.java
+@@ -107,8 +107,12 @@
+             DrawerLayout drawerLayout = mTermuxTerminalViewClient.getActivity().getDrawer();
+             if (drawerLayout.isDrawerOpen(Gravity.LEFT))
+                 drawerLayout.closeDrawer(Gravity.LEFT);
+-            else
++            else {
++                // w18: drawer khulne se pehle keyboard neeche karo, taaki keyboard sidebar par na chadhe.
++                // KeyboardUtils.hideSoftKeyboard null-safe hai (context/view null ho to early return).
++                com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(mTermuxTerminalViewClient.getActivity(), mTermuxTerminalViewClient.getActivity().getTerminalView());
+                 drawerLayout.openDrawer(Gravity.LEFT);
++            }
+         } else if ("PASTE".equals(key)) {
+             if(mTermuxTerminalSessionActivityClient != null)
+                 mTermuxTerminalSessionActivityClient.onPasteTextFromClipboard(null);
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -595,6 +595,16 @@
+         mTerminalView = findViewById(R.id.terminal_view);
+         mTerminalView.setTerminalViewClient(mTermuxTerminalViewClient);
+ 
++        // w18: drawer kisi bhi raaste se khule (edge swipe, tabs-bar fling, hardware
++        // shortcut) to keyboard neeche ho, sidebar par keyboard na rahe. Button path
++        // par hide pehle hi ho jata hai (ExtraKeys DRAWER); ye safety net hai.
++        getDrawer().addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
++            @Override
++            public void onDrawerOpened(View drawerView) {
++                com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(TermuxActivity.this, mTerminalView);
++            }
++        });
++
+         if (mTermuxTerminalViewClient != null)
+             mTermuxTerminalViewClient.onCreate();
+ 
