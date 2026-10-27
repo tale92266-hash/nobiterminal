@@ -1,0 +1,71 @@
+diff --git a/termux-app/app/src/main/res/values-night/colors.xml b/termux-app/app/src/main/res/values-night/colors.xml
+new file mode 100644
+index 0000000..97a9197
+--- /dev/null
++++ b/termux-app/app/src/main/res/values-night/colors.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- v21 w31: night twins of the mode-resolved Nobi tokens (deep navy-tinted body,
++         periwinkle secondary text). nobi_navy/nobi_cyan/nobi_periwinkle resolve from values/. -->
++    <color name="nobi_body_surface">#FF101730</color>
++    <color name="nobi_secondary_text">#FF9AA5D9</color>
++</resources>
+diff --git a/termux-app/app/src/main/res/values-night/themes.xml b/termux-app/app/src/main/res/values-night/themes.xml
+index 2ea2182..260d396 100644
+--- a/termux-app/app/src/main/res/values-night/themes.xml
++++ b/termux-app/app/src/main/res/values-night/themes.xml
+@@ -37,4 +37,23 @@
+         <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_key_pressed</item>
+     </style>
+ 
++    <!-- v21 w31: night twin of Theme.NobiSettings.DayNight. A style defined in
++         values-night/ REPLACES the values/ definition wholesale at night, so this
++         twin repeats the v17 navy-chrome items + the w30 cyan controls, with night
++         body/secondary values. Same parent: the DayNight base still resolves per mode. -->
++    <style name="Theme.NobiSettings.DayNight" parent="Theme.TermuxApp.DayNight.NoActionBar">
++        <item name="colorPrimary">@color/nobi_navy</item>
++        <item name="colorPrimaryVariant">@color/nobi_navy</item>
++        <item name="colorPrimaryDark">@color/nobi_navy</item>
++        <item name="colorOnPrimary">@color/white</item>
++        <item name="android:statusBarColor">@color/nobi_navy</item>
++        <item name="colorSecondary">@color/nobi_cyan</item>
++        <item name="colorControlActivated">@color/nobi_cyan</item>
++        <item name="colorControlNormal">@color/nobi_periwinkle</item>
++        <item name="android:windowBackground">@color/nobi_body_surface</item>
++        <item name="android:colorBackground">@color/nobi_body_surface</item>
++        <item name="colorSurface">@color/nobi_body_surface</item>
++        <item name="android:textColorSecondary">@color/nobi_secondary_text</item>
++    </style>
++
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index 04e8fbe..98c3739 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -10,4 +10,7 @@
+     <color name="nobi_key_pressed">#FF1E2C55</color>
+     <!-- v21 w30/w31: periwinkle secondary text for dark surfaces (never grey). -->
+     <color name="nobi_periwinkle">#FF9AA5D9</color>
++    <!-- v21 w31: mode-resolved body/secondary tokens (night twins live in values-night/colors.xml). -->
++    <color name="nobi_body_surface">#FFF4F6FC</color>
++    <color name="nobi_secondary_text">@color/nobi_navy</color>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index fee14ba..e077a38 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -34,6 +34,13 @@
+         <item name="colorSecondary">@color/nobi_cyan</item>
+         <item name="colorControlActivated">@color/nobi_cyan</item>
+         <item name="colorControlNormal">@color/nobi_navy</item>
++        <!-- v21 w31: navy-tinted body + Nobi-hue secondary text. The v16 luminance-follow
++             rule is untouched: SettingsActivity still picks day/night via setLocalNightMode,
++             which selects this twin vs the values-night twin below. -->
++        <item name="android:windowBackground">@color/nobi_body_surface</item>
++        <item name="android:colorBackground">@color/nobi_body_surface</item>
++        <item name="colorSurface">@color/nobi_body_surface</item>
++        <item name="android:textColorSecondary">@color/nobi_secondary_text</item>
+     </style>
+ 
+ 

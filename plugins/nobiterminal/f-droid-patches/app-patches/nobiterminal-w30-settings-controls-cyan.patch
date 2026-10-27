@@ -1,0 +1,26 @@
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index da9f16f..04e8fbe 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -8,4 +8,6 @@
+     <!-- v20: Nobi cyan (matches notification + splash name) + lighter-navy pressed surface for extra keys. -->
+     <color name="nobi_cyan">#FF22D3EE</color>
+     <color name="nobi_key_pressed">#FF1E2C55</color>
++    <!-- v21 w30/w31: periwinkle secondary text for dark surfaces (never grey). -->
++    <color name="nobi_periwinkle">#FF9AA5D9</color>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index 7696f92..fee14ba 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -30,6 +30,10 @@
+         <item name="colorPrimaryDark">@color/nobi_navy</item>
+         <item name="colorOnPrimary">@color/white</item>
+         <item name="android:statusBarColor">@color/nobi_navy</item>
++        <!-- v21 w30: Settings controls cyan; unchecked-control outline navy (day twin). -->
++        <item name="colorSecondary">@color/nobi_cyan</item>
++        <item name="colorControlActivated">@color/nobi_cyan</item>
++        <item name="colorControlNormal">@color/nobi_navy</item>
+     </style>
+ 
+ 

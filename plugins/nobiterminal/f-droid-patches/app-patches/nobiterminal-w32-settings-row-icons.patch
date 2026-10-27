@@ -1,0 +1,775 @@
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_code.xml b/termux-app/app/src/main/res/drawable/nobi_pref_code.xml
+new file mode 100644
+index 0000000..7126168
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_code.xml
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: code chevrons, cyan stroke (geometry as ic_nobi_code). -->
++    <path
++        android:pathData="M9.41,7.07 L4.83,12 L9.41,16.93"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++    <path
++        android:pathData="M14.59,7.07 L19.17,12 L14.59,16.93"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_copy.xml b/termux-app/app/src/main/res/drawable/nobi_pref_copy.xml
+new file mode 100644
+index 0000000..eafb3e8
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_copy.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: copy / backup, cyan fill (geometry as shared ic_copy). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M16,1L4,1c-1.1,0 -2,0.9 -2,2v14h2L4,3h12L16,1zM19,5L8,5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h11c1.1,0 2,-0.9 2,-2L21,7c0,-1.1 -0.9,-2 -2,-2zM19,21L8,21L8,7h11v14z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_download.xml b/termux-app/app/src/main/res/drawable/nobi_pref_download.xml
+new file mode 100644
+index 0000000..dd97c54
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_download.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: download into tray (restore). -->
++    <path
++        android:pathData="M12,4v10 M7,10l5,5 5,-5 M4,16v4h16v-4"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2.2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_gear.xml b/termux-app/app/src/main/res/drawable/nobi_pref_gear.xml
+new file mode 100644
+index 0000000..3b2ca75
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_gear.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: gear, cyan fill (geometry as upstream ic_settings). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_grid.xml b/termux-app/app/src/main/res/drawable/nobi_pref_grid.xml
+new file mode 100644
+index 0000000..dee5297
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_grid.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: four-square grid (widget / launcher). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M4,4h7v7H4zM13,4h7v7h-7zM4,13h7v7H4zM13,13h7v7h-7z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_info.xml b/termux-app/app/src/main/res/drawable/nobi_pref_info.xml
+new file mode 100644
+index 0000000..4fe1fa8
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_info.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: info disc, cyan fill (geometry as shared ic_info). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2L11,7h2v2z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_keyboard.xml b/termux-app/app/src/main/res/drawable/nobi_pref_keyboard.xml
+new file mode 100644
+index 0000000..6e7bcfa
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_keyboard.xml
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: keyboard outline + key dots. -->
++    <path
++        android:pathData="M4,6h16v12H4z"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M7,9h2v2H7zM11,9h2v2h-2zM15,9h2v2h-2zM7,13h2v2H7zM11,13h2v2h-2zM15,13h2v2h-2z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_list.xml b/termux-app/app/src/main/res/drawable/nobi_pref_list.xml
+new file mode 100644
+index 0000000..66792fa
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_list.xml
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: list: dots + rules. -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M4,5h2v2H4zM4,11h2v2H4zM4,17h2v2H4z" />
++    <path
++        android:pathData="M9,6h11 M9,12h11 M9,18h11"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_lock.xml b/termux-app/app/src/main/res/drawable/nobi_pref_lock.xml
+new file mode 100644
+index 0000000..d783ac9
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_lock.xml
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: padlock: filled body + shackle. -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M6,11h12v9H6z" />
++    <path
++        android:pathData="M9,11V8a3,3 0 0 1 6,0v3"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_play.xml b/termux-app/app/src/main/res/drawable/nobi_pref_play.xml
+new file mode 100644
+index 0000000..dcdf5fc
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_play.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: play triangle (animated intro). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M8,5l11,7 -11,7z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_power.xml b/termux-app/app/src/main/res/drawable/nobi_pref_power.xml
+new file mode 100644
+index 0000000..e6f3657
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_power.xml
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: power mark, cyan stroke (geometry as ic_nobi_exit). -->
++    <path
++        android:pathData="M12,3.5 L12,10.5"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2.2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++    <path
++        android:pathData="M17.6,6.6 A7.6,7.6 0 1 1 6.4,6.6"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2.2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_server.xml b/termux-app/app/src/main/res/drawable/nobi_pref_server.xml
+new file mode 100644
+index 0000000..3eb14e4
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_server.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: server stack, cyan fill (geometry as ic_nobi_server). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M4,3h16c1.1,0 2,0.9 2,2v4c0,1.1 -0.9,2 -2,2H4c-1.1,0 -2,-0.9 -2,-2V5c0,-1.1 0.9,-2 2,-2zM4,13h16c1.1,0 2,0.9 2,2v4c0,1.1 -0.9,2 -2,2H4c-1.1,0 -2,-0.9 -2,-2v-4c0,-1.1 0.9,-2 2,-2zM6,7h2v2H6V7zM6,17h2v2H6v-2z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_share.xml b/termux-app/app/src/main/res/drawable/nobi_pref_share.xml
+new file mode 100644
+index 0000000..f34a5b6
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_share.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: share nodes, cyan fill (geometry as shared ic_share). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M18,16.08c-0.76,0 -1.44,0.3 -1.96,0.77L8.91,12.7c0.05,-0.23 0.09,-0.46 0.09,-0.7s-0.04,-0.47 -0.09,-0.7l7.05,-4.11c0.54,0.5 1.25,0.81 2.04,0.81 1.66,0 3,-1.34 3,-3s-1.34,-3 -3,-3 -3,1.34 -3,3c0,0.24 0.04,0.47 0.09,0.7L8.04,9.81C7.5,9.31 6.79,9 6,9c-1.66,0 -3,1.34 -3,3s1.34,3 3,3c0.79,0 1.5,-0.31 2.04,-0.81l7.12,4.16c-0.05,0.21 -0.08,0.43 -0.08,0.65 0,1.61 1.31,2.92 2.92,2.92 1.61,0 2.92,-1.31 2.92,-2.92s-1.31,-2.92 -2.92,-2.92z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_sliders.xml b/termux-app/app/src/main/res/drawable/nobi_pref_sliders.xml
+new file mode 100644
+index 0000000..321a118
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_sliders.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: sliders, cyan fill (geometry as ic_nobi_tools). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M3,5h14v2H3V5zM3,11h8v2H3v-2zM3,17h11v2H3v-2zM19,4c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM13,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM16,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_terminal.xml b/termux-app/app/src/main/res/drawable/nobi_pref_terminal.xml
+new file mode 100644
+index 0000000..b6d94bb
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_terminal.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: terminal prompt: chevron + underscore. -->
++    <path
++        android:pathData="M7,6 L12,12 L7,18 M13,18 H19"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2.4"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_theme.xml b/termux-app/app/src/main/res/drawable/nobi_pref_theme.xml
+new file mode 100644
+index 0000000..f2ec116
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_theme.xml
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: half-filled disc (theme). -->
++    <path
++        android:pathData="M12,3a9,9 0 1,0 0,18a9,9 0 0,0 0,-18z"
++        android:strokeColor="@color/nobi_cyan"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="@android:color/transparent" />
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M12,3a9,9 0 0,1 0,18z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_pref_window.xml b/termux-app/app/src/main/res/drawable/nobi_pref_window.xml
+new file mode 100644
+index 0000000..78160ca
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_pref_window.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <!-- v21 w32: overlapping windows, cyan fill (geometry as ic_new_window). -->
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:fillAlpha="0.55"
++        android:pathData="M9,3 L21,3 L21,15 L9,15 Z" />
++    <path
++        android:fillColor="@color/nobi_cyan"
++        android:pathData="M3,5 L15,5 L15,17 L3,17 Z" />
++</vector>
+diff --git a/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml b/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
+index 7c16384..a5ca48b 100644
+--- a/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
++++ b/termux-app/app/src/main/res/xml/nobi_extra_keys_preferences.xml
+@@ -1,6 +1,7 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <ListPreference
++        app:icon="@drawable/nobi_pref_sliders"
+         app:key="nobi_extra_keys_preset"
+         app:title="@string/nobi_extra_keys_preset_title"
+         app:summary="@string/nobi_extra_keys_screen_summary"
+@@ -9,6 +10,7 @@
+         app:defaultValue="custom"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_list"
+         app:key="nobi_extra_keys_reorder"
+         app:title="@string/nobi_extra_keys_reorder_preference_title"
+         app:summary="@string/nobi_extra_keys_reorder_preference_summary"
+@@ -18,54 +20,71 @@
+         app:title="@string/nobi_extra_keys_keys_title">
+ 
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_ESC"
+             app:title="ESC"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_DRAWER"
+             app:title="@string/nobi_key_drawer_title"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_TAB"
+             app:title="TAB"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_CTRL"
+             app:title="CTRL"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_ALT"
+             app:title="ALT"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_|"
+             app:title="|"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_-"
+             app:title="-"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_/"
+             app:title="/"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key__"
+             app:title="_"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_HOME"
+             app:title="HOME"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_END"
+             app:title="END"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_PGUP"
+             app:title="PGUP"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_PGDN"
+             app:title="PGDN"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_LEFT"
+             app:title="LEFT"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_DOWN"
+             app:title="DOWN"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_UP"
+             app:title="UP"/>
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_key_RIGHT"
+             app:title="RIGHT"/>
+ 
+diff --git a/termux-app/app/src/main/res/xml/nobi_theme_preferences.xml b/termux-app/app/src/main/res/xml/nobi_theme_preferences.xml
+index 7bc5718..62c3ef1 100644
+--- a/termux-app/app/src/main/res/xml/nobi_theme_preferences.xml
++++ b/termux-app/app/src/main/res/xml/nobi_theme_preferences.xml
+@@ -1,6 +1,7 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <ListPreference
++        app:icon="@drawable/nobi_pref_theme"
+         app:key="nobi_theme_list"
+         app:title="@string/nobi_theme_preference_title"
+         app:summary="@string/nobi_theme_screen_summary"
+diff --git a/termux-app/app/src/main/res/xml/root_preferences.xml b/termux-app/app/src/main/res/xml/root_preferences.xml
+index b202cef..44c595a 100644
+--- a/termux-app/app/src/main/res/xml/root_preferences.xml
++++ b/termux-app/app/src/main/res/xml/root_preferences.xml
+@@ -1,12 +1,14 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_gear"
+         app:key="termux"
+         app:title="@string/termux_preferences_title"
+         app:summary="@string/termux_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_server"
+         app:key="termux_api"
+         app:title="@string/termux_api_preferences_title"
+         app:summary="@string/termux_api_preferences_summary"
+@@ -14,6 +16,7 @@
+         app:fragment="com.termux.app.fragments.settings.TermuxAPIPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_window"
+         app:key="termux_float"
+         app:title="@string/termux_float_preferences_title"
+         app:summary="@string/termux_float_preferences_summary"
+@@ -21,6 +24,7 @@
+         app:fragment="com.termux.app.fragments.settings.TermuxFloatPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_sliders"
+         app:key="termux_tasker"
+         app:title="@string/termux_tasker_preferences_title"
+         app:summary="@string/termux_tasker_preferences_summary"
+@@ -28,6 +32,7 @@
+         app:fragment="com.termux.app.fragments.settings.TermuxTaskerPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_grid"
+         app:key="termux_widget"
+         app:title="@string/termux_widget_preferences_title"
+         app:summary="@string/termux_widget_preferences_summary"
+@@ -35,12 +40,14 @@
+         app:fragment="com.termux.app.fragments.settings.TermuxWidgetPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_info"
+         app:key="about"
+         app:title="@string/about_preference_title"
+         app:persistent="false"/>
+     <!-- app:layout="@layout/preference_markdown_text" -->
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_share"
+         app:key="donate"
+         app:title="@string/donate_preference_title"
+         app:persistent="false"
+@@ -51,60 +58,70 @@
+         app:title="@string/nobi_settings_category_title">
+ 
+         <Preference
++            app:icon="@drawable/nobi_pref_copy"
+             app:key="nobi_backup"
+             app:title="@string/nobi_backup_preference_title"
+             app:summary="@string/nobi_backup_preference_summary"
+             app:persistent="false"/>
+ 
+         <Preference
++            app:icon="@drawable/nobi_pref_download"
+             app:key="nobi_restore"
+             app:title="@string/nobi_restore_preference_title"
+             app:summary="@string/nobi_restore_preference_summary"
+             app:persistent="false"/>
+ 
+         <Preference
++            app:icon="@drawable/nobi_pref_code"
+             app:key="nobi_dev_setup"
+             app:title="@string/nobi_dev_setup_preference_title"
+             app:summary="@string/nobi_dev_setup_preference_summary"
+             app:persistent="false"/>
+ 
+         <Preference
++            app:icon="@drawable/nobi_pref_theme"
+             app:key="nobi_theme"
+             app:title="@string/nobi_theme_preference_title"
+             app:summary="@string/nobi_theme_preference_summary"
+             app:fragment="com.termux.app.fragments.settings.nobi.ThemePreferencesFragment"/>
+ 
+         <Preference
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="nobi_extra_keys"
+             app:title="@string/nobi_extra_keys_preference_title"
+             app:summary="@string/nobi_extra_keys_preference_summary"
+             app:fragment="com.termux.app.fragments.settings.nobi.ExtraKeysPreferencesFragment"/>
+ 
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_power"
+             app:key="nobi_wake_lock"
+             app:title="@string/nobi_wake_lock_preference_title"
+             app:summary="@string/nobi_wake_lock_preference_summary"
+             app:defaultValue="false"/>
+ 
+         <Preference
++            app:icon="@drawable/nobi_pref_lock"
+             app:key="nobi_app_lock"
+             app:title="@string/nobi_app_lock_preference_title"
+             app:summary="@string/nobi_app_lock_preference_summary"
+             app:persistent="false"/>
+ 
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_list"
+             app:key="nobi_startup_picker"
+             app:title="@string/nobi_startup_picker_preference_title"
+             app:summary="@string/nobi_startup_picker_preference_summary"
+             app:defaultValue="true"/>
+ 
+         <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_play"
+             app:key="nobi_animated_intro"
+             app:title="@string/nobi_animated_intro_preference_title"
+             app:summary="@string/nobi_animated_intro_preference_summary"
+             app:defaultValue="true"/>
+ 
+         <ListPreference
++            app:icon="@drawable/nobi_pref_terminal"
+             app:key="nobi_launcher_icon"
+             app:title="@string/nobi_launcher_icon_preference_title"
+             app:summary="@string/nobi_launcher_icon_preference_summary"
+diff --git a/termux-app/app/src/main/res/xml/termux_api_debugging_preferences.xml b/termux-app/app/src/main/res/xml/termux_api_debugging_preferences.xml
+index 8bfd8c7..d129af9 100644
+--- a/termux-app/app/src/main/res/xml/termux_api_debugging_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_api_debugging_preferences.xml
+@@ -5,6 +5,7 @@
+         app:title="@string/termux_logging_header">
+ 
+         <ListPreference
++            app:icon="@drawable/nobi_pref_list"
+             app:defaultValue="1"
+             app:key="log_level"
+             app:title="@string/termux_log_level_title"
+diff --git a/termux-app/app/src/main/res/xml/termux_api_preferences.xml b/termux-app/app/src/main/res/xml/termux_api_preferences.xml
+index 285ec2c..d2c7f3e 100644
+--- a/termux-app/app/src/main/res/xml/termux_api_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_api_preferences.xml
+@@ -1,6 +1,7 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_list"
+         app:title="@string/termux_debugging_preferences_title"
+         app:summary="@string/termux_debugging_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux_api.DebuggingPreferencesFragment"/>
+diff --git a/termux-app/app/src/main/res/xml/termux_debugging_preferences.xml b/termux-app/app/src/main/res/xml/termux_debugging_preferences.xml
+index b59d931..c9ad6a5 100644
+--- a/termux-app/app/src/main/res/xml/termux_debugging_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_debugging_preferences.xml
+@@ -5,24 +5,28 @@
+         app:title="@string/termux_logging_header">
+ 
+         <ListPreference
++            app:icon="@drawable/nobi_pref_list"
+             app:defaultValue="1"
+             app:key="log_level"
+             app:title="@string/termux_log_level_title"
+             app:useSimpleSummaryProvider="true" />
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="terminal_view_key_logging_enabled"
+             app:summaryOff="@string/termux_terminal_view_key_logging_enabled_off"
+             app:summaryOn="@string/termux_terminal_view_key_logging_enabled_on"
+             app:title="@string/termux_terminal_view_key_logging_enabled_title" />
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_ic_bell"
+             app:key="plugin_error_notifications_enabled"
+             app:summaryOff="@string/termux_plugin_error_notifications_enabled_off"
+             app:summaryOn="@string/termux_plugin_error_notifications_enabled_on"
+             app:title="@string/termux_plugin_error_notifications_enabled_title" />
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_ic_bell"
+             app:key="crash_report_notifications_enabled"
+             app:summaryOff="@string/termux_crash_report_notifications_enabled_off"
+             app:summaryOn="@string/termux_crash_report_notifications_enabled_on"
+diff --git a/termux-app/app/src/main/res/xml/termux_float_debugging_preferences.xml b/termux-app/app/src/main/res/xml/termux_float_debugging_preferences.xml
+index 8b4847c..fb60c65 100644
+--- a/termux-app/app/src/main/res/xml/termux_float_debugging_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_float_debugging_preferences.xml
+@@ -5,12 +5,14 @@
+         app:title="@string/termux_logging_header">
+ 
+         <ListPreference
++            app:icon="@drawable/nobi_pref_list"
+             app:defaultValue="1"
+             app:key="log_level"
+             app:title="@string/termux_log_level_title"
+             app:useSimpleSummaryProvider="true" />
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="terminal_view_key_logging_enabled"
+             app:summaryOff="@string/termux_terminal_view_key_logging_enabled_off"
+             app:summaryOn="@string/termux_terminal_view_key_logging_enabled_on"
+diff --git a/termux-app/app/src/main/res/xml/termux_float_preferences.xml b/termux-app/app/src/main/res/xml/termux_float_preferences.xml
+index 9378ae1..bf90ed3 100644
+--- a/termux-app/app/src/main/res/xml/termux_float_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_float_preferences.xml
+@@ -1,6 +1,7 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_list"
+         app:title="@string/termux_debugging_preferences_title"
+         app:summary="@string/termux_debugging_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux_float.DebuggingPreferencesFragment"/>
+diff --git a/termux-app/app/src/main/res/xml/termux_preferences.xml b/termux-app/app/src/main/res/xml/termux_preferences.xml
+index 90353c5..64763ad 100644
+--- a/termux-app/app/src/main/res/xml/termux_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_preferences.xml
+@@ -1,16 +1,19 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_list"
+         app:title="@string/termux_debugging_preferences_title"
+         app:summary="@string/termux_debugging_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux.DebuggingPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_keyboard"
+         app:title="@string/termux_terminal_io_preferences_title"
+         app:summary="@string/termux_terminal_io_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux.TerminalIOPreferencesFragment"/>
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_terminal"
+         app:title="@string/termux_terminal_view_preferences_title"
+         app:summary="@string/termux_terminal_view_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux.TerminalViewPreferencesFragment"/>
+diff --git a/termux-app/app/src/main/res/xml/termux_tasker_debugging_preferences.xml b/termux-app/app/src/main/res/xml/termux_tasker_debugging_preferences.xml
+index 8bfd8c7..d129af9 100644
+--- a/termux-app/app/src/main/res/xml/termux_tasker_debugging_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_tasker_debugging_preferences.xml
+@@ -5,6 +5,7 @@
+         app:title="@string/termux_logging_header">
+ 
+         <ListPreference
++            app:icon="@drawable/nobi_pref_list"
+             app:defaultValue="1"
+             app:key="log_level"
+             app:title="@string/termux_log_level_title"
+diff --git a/termux-app/app/src/main/res/xml/termux_tasker_preferences.xml b/termux-app/app/src/main/res/xml/termux_tasker_preferences.xml
+index 9aa7248..e83ecda 100644
+--- a/termux-app/app/src/main/res/xml/termux_tasker_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_tasker_preferences.xml
+@@ -1,6 +1,7 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_list"
+         app:title="@string/termux_debugging_preferences_title"
+         app:summary="@string/termux_debugging_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux_tasker.DebuggingPreferencesFragment"/>
+diff --git a/termux-app/app/src/main/res/xml/termux_terminal_io_preferences.xml b/termux-app/app/src/main/res/xml/termux_terminal_io_preferences.xml
+index ea9a0eb..2179d2c 100644
+--- a/termux-app/app/src/main/res/xml/termux_terminal_io_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_terminal_io_preferences.xml
+@@ -5,12 +5,14 @@
+         app:title="@string/termux_keyboard_header">
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="soft_keyboard_enabled"
+             app:summaryOff="@string/termux_soft_keyboard_enabled_off"
+             app:summaryOn="@string/termux_soft_keyboard_enabled_on"
+             app:title="@string/termux_soft_keyboard_enabled_title" />
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_pref_keyboard"
+             app:key="soft_keyboard_enabled_only_if_no_hardware"
+             app:summaryOff="@string/termux_soft_keyboard_enabled_only_if_no_hardware_off"
+             app:summaryOn="@string/termux_soft_keyboard_enabled_only_if_no_hardware_on"
+diff --git a/termux-app/app/src/main/res/xml/termux_terminal_view_preferences.xml b/termux-app/app/src/main/res/xml/termux_terminal_view_preferences.xml
+index 3f66863..b6c7825 100644
+--- a/termux-app/app/src/main/res/xml/termux_terminal_view_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_terminal_view_preferences.xml
+@@ -5,6 +5,7 @@
+         app:title="@string/termux_terminal_view_view_header">
+ 
+         <SwitchPreferenceCompat
++            app:icon="@drawable/nobi_pref_sliders"
+             app:key="terminal_margin_adjustment"
+             app:summaryOff="@string/termux_terminal_view_terminal_margin_adjustment_off"
+             app:summaryOn="@string/termux_terminal_view_terminal_margin_adjustment_on"
+diff --git a/termux-app/app/src/main/res/xml/termux_widget_debugging_preferences.xml b/termux-app/app/src/main/res/xml/termux_widget_debugging_preferences.xml
+index 8bfd8c7..d129af9 100644
+--- a/termux-app/app/src/main/res/xml/termux_widget_debugging_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_widget_debugging_preferences.xml
+@@ -5,6 +5,7 @@
+         app:title="@string/termux_logging_header">
+ 
+         <ListPreference
++            app:icon="@drawable/nobi_pref_list"
+             app:defaultValue="1"
+             app:key="log_level"
+             app:title="@string/termux_log_level_title"
+diff --git a/termux-app/app/src/main/res/xml/termux_widget_preferences.xml b/termux-app/app/src/main/res/xml/termux_widget_preferences.xml
+index aaf0195..07f8769 100644
+--- a/termux-app/app/src/main/res/xml/termux_widget_preferences.xml
++++ b/termux-app/app/src/main/res/xml/termux_widget_preferences.xml
+@@ -1,6 +1,7 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <Preference
++        app:icon="@drawable/nobi_pref_list"
+         app:title="@string/termux_debugging_preferences_title"
+         app:summary="@string/termux_debugging_preferences_summary"
+         app:fragment="com.termux.app.fragments.settings.termux_widget.DebuggingPreferencesFragment"/>

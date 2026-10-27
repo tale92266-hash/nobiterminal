@@ -1,0 +1,64 @@
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+index b3502b7..f8691d4 100644
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -147,6 +147,7 @@
+ 
+         <activity
+             android:name=".app.activities.HelpActivity"
++            android:theme="@style/Theme.NobiHelp.DayNight"
+             android:exported="false"
+             android:label="@string/application_name"
+             android:parentActivityName=".app.TermuxActivity"
+diff --git a/termux-app/app/src/main/java/com/termux/app/activities/HelpActivity.java b/termux-app/app/src/main/java/com/termux/app/activities/HelpActivity.java
+index 7609659..8833a10 100644
+--- a/termux-app/app/src/main/java/com/termux/app/activities/HelpActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/activities/HelpActivity.java
+@@ -9,6 +9,11 @@ import android.webkit.WebSettings;
+ import android.webkit.WebView;
+ import android.webkit.WebViewClient;
+ import android.widget.ProgressBar;
++import android.content.res.ColorStateList;
++
++import androidx.core.content.ContextCompat;
++
++import com.termux.R;
+ import android.widget.RelativeLayout;
+ 
+ import androidx.appcompat.app.AppCompatActivity;
+@@ -29,6 +34,8 @@ public final class HelpActivity extends AppCompatActivity {
+         lParams.addRule(RelativeLayout.CENTER_IN_PARENT);
+         ProgressBar progressBar = new ProgressBar(this);
+         progressBar.setIndeterminate(true);
++        // v21 w42: cyan spinner, pinned explicitly (theme colorAccent is the fallback).
++        progressBar.setIndeterminateTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.nobi_cyan)));
+         progressBar.setLayoutParams(lParams);
+         progressLayout.addView(progressBar);
+ 
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index c45ffd0..368d288 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -58,6 +58,22 @@
+     </style>
+ 
+ 
++    <!-- v21 w42: Help-only identity theme. HelpActivity has no layout toolbar: it
++         uses the framework ActionBar from this DarkActionBar parent, so navy primary
++         items give it a navy bar + white title in both modes. WebView content (the
++         Termux wiki site) is NOT themeable and is untouched; colorAccent cyan tints
++         the loading ProgressBar (also pinned explicitly in code). -->
++    <style name="Theme.NobiHelp.DayNight" parent="Theme.TermuxApp.DayNight.DarkActionBar">
++        <item name="colorPrimary">@color/nobi_navy</item>
++        <item name="colorPrimaryVariant">@color/nobi_navy</item>
++        <item name="colorPrimaryDark">@color/nobi_navy</item>
++        <item name="colorOnPrimary">@color/white</item>
++        <item name="android:statusBarColor">@color/nobi_navy</item>
++        <item name="colorSecondary">@color/nobi_cyan</item>
++        <item name="colorControlActivated">@color/nobi_cyan</item>
++        <item name="android:colorAccent">@color/nobi_cyan</item>
++    </style>
++
+     <!-- TermuxActivity DayNight NoActionBar theme. -->
+     <style name="Theme.TermuxActivity.DayNight.NoActionBar" parent="Theme.TermuxApp.DayNight.NoActionBar">
+         <!-- Primary brand color. -->

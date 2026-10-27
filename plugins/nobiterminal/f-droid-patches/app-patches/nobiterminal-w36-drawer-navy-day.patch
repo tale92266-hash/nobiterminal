@@ -1,0 +1,16 @@
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index e077a38..9237291 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -65,8 +65,9 @@
+ 
+         <!-- Left drawer. -->
+         <item name="buttonBarButtonStyle">@style/TermuxActivity.Drawer.ButtonBarStyle.Light</item>
+-        <item name="termuxActivityDrawerBackground">@color/white</item>
+-        <item name="termuxActivityDrawerImageTint">@color/black</item>
++        <!-- v21 w36: drawer navy in BOTH modes (night twin already navy/white). -->
++        <item name="termuxActivityDrawerBackground">@color/nobi_navy</item>
++        <item name="termuxActivityDrawerImageTint">@color/white</item>
+ 
+         <!-- Extra keys colors. -->
+         <item name="extraKeysButtonTextColor">@color/white</item>

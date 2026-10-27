@@ -1,0 +1,38 @@
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+index dc2505f..b3502b7 100644
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -161,7 +161,7 @@
+ 
+         <activity
+             android:name=".shared.activities.ReportActivity"
+-            android:theme="@style/Theme.MarkdownViewActivity.DayNight"
++            android:theme="@style/Theme.NobiReport.DayNight"
+             android:documentLaunchMode="intoExisting" />
+ 
+         <activity
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index 59c3367..c45ffd0 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -43,6 +43,20 @@
+         <item name="android:textColorSecondary">@color/nobi_secondary_text</item>
+     </style>
+ 
++    <!-- v21 w41: Report-only identity theme (v17 Settings pattern). ReportActivity
++         uses the shared partial_primary_toolbar whose background is colorPrimaryDark,
++         so navy primary items give it a Settings-like navy toolbar + white title in
++         both modes. TOOLBAR ONLY: markdown body colors/layouts are untouched. -->
++    <style name="Theme.NobiReport.DayNight" parent="Theme.TermuxApp.DayNight.NoActionBar">
++        <item name="colorPrimary">@color/nobi_navy</item>
++        <item name="colorPrimaryVariant">@color/nobi_navy</item>
++        <item name="colorPrimaryDark">@color/nobi_navy</item>
++        <item name="colorOnPrimary">@color/white</item>
++        <item name="android:statusBarColor">@color/nobi_navy</item>
++        <item name="colorSecondary">@color/nobi_cyan</item>
++        <item name="colorControlActivated">@color/nobi_cyan</item>
++    </style>
++
+ 
+     <!-- TermuxActivity DayNight NoActionBar theme. -->
+     <style name="Theme.TermuxActivity.DayNight.NoActionBar" parent="Theme.TermuxApp.DayNight.NoActionBar">

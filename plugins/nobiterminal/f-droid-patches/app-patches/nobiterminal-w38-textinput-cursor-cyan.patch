@@ -1,0 +1,39 @@
+diff --git a/termux-app/app/src/main/res/drawable/nobi_text_cursor.xml b/termux-app/app/src/main/res/drawable/nobi_text_cursor.xml
+new file mode 100644
+index 0000000..76ef667
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_text_cursor.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- v21 w38: cyan text cursor for the terminal text-input bar (2dp). -->
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="rectangle">
++    <size android:width="2dp" />
++    <solid android:color="@color/nobi_cyan" />
++</shape>
+diff --git a/termux-app/app/src/main/res/layout/view_terminal_toolbar_text_input.xml b/termux-app/app/src/main/res/layout/view_terminal_toolbar_text_input.xml
+index 86b3ce9..98352a3 100644
+--- a/termux-app/app/src/main/res/layout/view_terminal_toolbar_text_input.xml
++++ b/termux-app/app/src/main/res/layout/view_terminal_toolbar_text_input.xml
+@@ -9,8 +9,8 @@
+     android:inputType="text"
+     android:importantForAutofill="no"
+     android:textColor="@android:color/white"
+-    android:textColorHighlight="@android:color/darker_gray"
++    android:textColorHighlight="@color/nobi_cyan_highlight"
+     android:paddingTop="0dp"
+-    android:textCursorDrawable="@null"
++    android:textCursorDrawable="@drawable/nobi_text_cursor"
+     android:paddingBottom="0dp"
+     tools:ignore="LabelFor" />
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index 98c3739..c047ae7 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -13,4 +13,6 @@
+     <!-- v21 w31: mode-resolved body/secondary tokens (night twins live in values-night/colors.xml). -->
+     <color name="nobi_body_surface">#FFF4F6FC</color>
+     <color name="nobi_secondary_text">@color/nobi_navy</color>
++    <!-- v21 w38: 40% cyan selection highlight for the terminal text-input bar. -->
++    <color name="nobi_cyan_highlight">#6622D3EE</color>
+ </resources>

@@ -1,0 +1,24 @@
+diff --git a/termux-app/app/src/main/res/drawable/terminal_scroll_shape.xml b/termux-app/app/src/main/res/drawable/terminal_scroll_shape.xml
+index 76cb071..d88259d 100644
+--- a/termux-app/app/src/main/res/drawable/terminal_scroll_shape.xml
++++ b/termux-app/app/src/main/res/drawable/terminal_scroll_shape.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <shape xmlns:android="http://schemas.android.com/apk/res/android" >
+ 
+-    <solid android:color="#66FFFFFF" />
++    <solid android:color="@color/nobi_scroll_thumb" />
+ 
+     <size android:width="4dp" />
+ 
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index c047ae7..eba946b 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -15,4 +15,6 @@
+     <color name="nobi_secondary_text">@color/nobi_navy</color>
+     <!-- v21 w38: 40% cyan selection highlight for the terminal text-input bar. -->
+     <color name="nobi_cyan_highlight">#6622D3EE</color>
++    <!-- v21 w39: scrollbar thumb tint, >=3:1 on black (5.49:1) and white (3.83:1). -->
++    <color name="nobi_scroll_thumb">#FF6B7FC7</color>
+ </resources>

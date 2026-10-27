@@ -1,0 +1,65 @@
+diff --git a/termux-app/termux-shared/src/main/res/layout/partial_primary_toolbar.xml b/termux-app/termux-shared/src/main/res/layout/partial_primary_toolbar.xml
+index a3f1be5..263bedf 100644
+--- a/termux-app/termux-shared/src/main/res/layout/partial_primary_toolbar.xml
++++ b/termux-app/termux-shared/src/main/res/layout/partial_primary_toolbar.xml
+@@ -13,8 +13,8 @@
+         android:background="?attr/colorPrimaryDark"
+         android:gravity="center_vertical"
+         android:minHeight="?attr/actionBarSize"
+-        android:theme="@style/ThemeOverlay.AppCompat.DayNight.ActionBar"
+-        app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight"
++        android:theme="@style/ThemeOverlay.NobiToolbar.DayNight"
++        app:popupTheme="@style/ThemeOverlay.NobiPopup.DayNight"
+         app:titleTextAppearance="@style/TextAppearance.Widget.BaseToolbar.Title"
+         app:subtitleTextAppearance="@style/TextAppearance.Widget.BaseToolbar.Subtitle">
+     </androidx.appcompat.widget.Toolbar>
+diff --git a/termux-app/termux-shared/src/main/res/values/colors.xml b/termux-app/termux-shared/src/main/res/values/colors.xml
+index 1e4c5ae..5f14ee3 100644
+--- a/termux-app/termux-shared/src/main/res/values/colors.xml
++++ b/termux-app/termux-shared/src/main/res/values/colors.xml
+@@ -20,4 +20,10 @@
+ 
+     <color name="blue_link_light">#0969DA</color>
+     <color name="blue_link_dark">#58A6FF</color>
++
++    <!-- v21 w33/w34: Nobi tokens for the shared module (same hex as app colors.xml;
++         library modules cannot reference the app module's colors). -->
++    <color name="nobi_navy">#FF0A0F24</color>
++    <color name="nobi_cyan">#FF22D3EE</color>
++    <color name="nobi_cyan_highlight">#4022D3EE</color>
+ </resources>
+diff --git a/termux-app/termux-shared/src/main/res/values/styles.xml b/termux-app/termux-shared/src/main/res/values/styles.xml
+index 19f5664..1f0fe28 100644
+--- a/termux-app/termux-shared/src/main/res/values/styles.xml
++++ b/termux-app/termux-shared/src/main/res/values/styles.xml
+@@ -2,8 +2,29 @@
+ <resources>
+ 
+     <!-- BaseToolbar Title text appearance. -->
++    <!-- v21 w33: toolbar title 14sp -> 16sp semibold. -->
+     <style name="TextAppearance.Widget.BaseToolbar.Title" parent="TextAppearance.Widget.AppCompat.Toolbar.Title">
+-        <item name="android:textSize">14sp</item>
++        <item name="android:textSize">16sp</item>
++        <item name="android:fontFamily">sans-serif-medium</item>
++    </style>
++
++    <!-- v21 w33: toolbar chrome overlay. Dark.ActionBar-based so the title and
++         navigation icon stay light on the navy toolbar in BOTH modes (the DayNight
++         overlay would give dark title text in day mode). -->
++    <style name="ThemeOverlay.NobiToolbar.DayNight" parent="ThemeOverlay.AppCompat.Dark.ActionBar">
++        <item name="android:textColorPrimary">@color/white</item>
++        <item name="colorControlNormal">@color/white</item>
++    </style>
++
++    <!-- v21 w33: Nobi popup menu. Navy surface, white item text, cyan press highlight. -->
++    <style name="ThemeOverlay.NobiPopup.DayNight" parent="ThemeOverlay.AppCompat.DayNight">
++        <item name="popupMenuStyle">@style/Widget.Nobi.PopupMenu</item>
++        <item name="android:textColorPrimary">@color/white</item>
++        <item name="colorControlHighlight">@color/nobi_cyan_highlight</item>
++    </style>
++
++    <style name="Widget.Nobi.PopupMenu" parent="Widget.AppCompat.PopupMenu">
++        <item name="android:popupBackground">@color/nobi_navy</item>
+     </style>
+ 
+     <!-- BaseToolbar Subtitle text appearance. -->

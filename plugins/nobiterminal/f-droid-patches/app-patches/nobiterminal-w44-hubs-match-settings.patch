@@ -1,0 +1,252 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiNotificationsActivity.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiNotificationsActivity.java
+index 84f0d13..3b14c9c 100644
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiNotificationsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiNotificationsActivity.java
+@@ -57,6 +57,11 @@ public class NobiNotificationsActivity extends AppCompatActivity {
+         MaterialToolbar toolbar = findViewById(R.id.nobiNotificationsToolbar);
+         toolbar.setNavigationOnClickListener(v -> finish());
+ 
++        // v21 w44: white title + white back arrow on the navy toolbar (v17 pattern).
++        toolbar.setTitleTextColor(android.graphics.Color.WHITE);
++        android.graphics.drawable.Drawable navIcon = toolbar.getNavigationIcon();
++        if (navIcon != null) navIcon.mutate().setTint(android.graphics.Color.WHITE);
++
+         emptyState = findViewById(R.id.nobiNotificationsEmpty);
+         emptyText = findViewById(R.id.nobiNotificationsEmptyText);
+         grantButton = findViewById(R.id.nobiNotificationsGrantButton);
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiPermissionsActivity.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiPermissionsActivity.java
+index cbfd23f..8189473 100644
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiPermissionsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiPermissionsActivity.java
+@@ -50,6 +50,11 @@ public class NobiPermissionsActivity extends AppCompatActivity {
+         MaterialToolbar toolbar = findViewById(R.id.nobiPermissionsToolbar);
+         toolbar.setNavigationOnClickListener(v -> finish());
+ 
++        // v21 w44: white title + white back arrow on the navy toolbar (v17 pattern).
++        toolbar.setTitleTextColor(android.graphics.Color.WHITE);
++        android.graphics.drawable.Drawable navIcon = toolbar.getNavigationIcon();
++        if (navIcon != null) navIcon.mutate().setTint(android.graphics.Color.WHITE);
++
+         findViewById(R.id.nobiPermissionsViewNotifications).setOnClickListener(v ->
+                 startActivity(new Intent(this, NobiNotificationsActivity.class)));
+ 
+diff --git a/termux-app/app/src/main/res/layout/activity_nobi_notifications.xml b/termux-app/app/src/main/res/layout/activity_nobi_notifications.xml
+index 4e4d950..ca2f8da 100644
+--- a/termux-app/app/src/main/res/layout/activity_nobi_notifications.xml
++++ b/termux-app/app/src/main/res/layout/activity_nobi_notifications.xml
+@@ -4,14 +4,15 @@
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
+     android:orientation="vertical"
+-    android:background="?attr/colorSurface">
++    android:background="@color/nobi_body_surface">
+ 
+     <com.google.android.material.appbar.MaterialToolbar
+         android:id="@+id/nobiNotificationsToolbar"
+         android:layout_width="match_parent"
+         android:layout_height="?attr/actionBarSize"
+-        android:background="?attr/colorSurface"
++        android:background="@color/nobi_navy"
+         app:title="@string/nobi_notifications_title"
++        app:titleTextColor="@android:color/white"
+         app:navigationIcon="@drawable/nobi_ic_arrow_back" />
+ 
+     <!-- Empty state: shown when access is off, or when nothing arrived yet. -->
+@@ -36,6 +37,7 @@
+             android:layout_marginTop="16dp"
+             android:gravity="center"
+             android:text="@string/nobi_notifications_empty_no_access"
++            android:textColor="@color/nobi_secondary_text"
+             android:textSize="15sp" />
+ 
+         <Button
+@@ -43,7 +45,9 @@
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:layout_marginTop="16dp"
+-            android:text="@string/nobi_notifications_grant" />
++            android:text="@string/nobi_notifications_grant"
++            app:backgroundTint="@color/nobi_cyan"
++            android:textColor="@color/nobi_navy" />
+     </LinearLayout>
+ 
+     <ScrollView
+@@ -72,13 +76,16 @@
+             android:layout_height="wrap_content"
+             android:layout_weight="1"
+             android:text="@string/nobi_notifications_showing_latest"
++            android:textColor="@color/nobi_secondary_text"
+             android:textSize="13sp" />
+ 
+         <Button
+             android:id="@+id/nobiNotificationsClearButton"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+-            android:text="@string/nobi_notifications_clear" />
++            android:text="@string/nobi_notifications_clear"
++            app:backgroundTint="@color/nobi_cyan"
++            android:textColor="@color/nobi_navy" />
+     </LinearLayout>
+ 
+ </LinearLayout>
+diff --git a/termux-app/app/src/main/res/layout/activity_nobi_permissions.xml b/termux-app/app/src/main/res/layout/activity_nobi_permissions.xml
+index f799269..63e2cbb 100644
+--- a/termux-app/app/src/main/res/layout/activity_nobi_permissions.xml
++++ b/termux-app/app/src/main/res/layout/activity_nobi_permissions.xml
+@@ -3,7 +3,7 @@
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
+-    android:background="?attr/colorSurface">
++    android:background="@color/nobi_body_surface">
+ 
+     <LinearLayout
+         android:layout_width="match_parent"
+@@ -14,8 +14,9 @@
+             android:id="@+id/nobiPermissionsToolbar"
+             android:layout_width="match_parent"
+             android:layout_height="?attr/actionBarSize"
+-            android:background="?attr/colorSurface"
++            android:background="@color/nobi_navy"
+             app:title="@string/nobi_permissions_title"
++            app:titleTextColor="@android:color/white"
+             app:navigationIcon="@drawable/nobi_ic_arrow_back" />
+ 
+         <TextView
+@@ -26,6 +27,7 @@
+             android:paddingEnd="16dp"
+             android:paddingBottom="8dp"
+             android:text="@string/nobi_permissions_intro"
++            android:textColor="@color/nobi_secondary_text"
+             android:textSize="14sp" />
+ 
+         <Button
+@@ -34,7 +36,9 @@
+             android:layout_height="wrap_content"
+             android:layout_marginStart="16dp"
+             android:layout_marginBottom="8dp"
+-            android:text="@string/nobi_notifications_view" />
++            android:text="@string/nobi_notifications_view"
++            app:backgroundTint="@color/nobi_cyan"
++            android:textColor="@color/nobi_navy" />
+ 
+         <!-- One row per permission: title, what it is for, status. Tapping a
+              row requests that permission only — nothing is ever requested
+@@ -74,11 +78,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_notif_access_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusNotifAccess"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+@@ -119,11 +125,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_overlay_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusOverlay"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+@@ -164,11 +172,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_all_files_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusAllFiles"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+@@ -209,11 +219,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_install_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusInstall"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+@@ -254,11 +266,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_battery_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusBattery"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+@@ -299,11 +313,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_post_notif_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusPostNotif"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+@@ -344,11 +360,13 @@
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:text="@string/nobi_perm_storage_desc"
++                    android:textColor="@color/nobi_secondary_text"
+                     android:textSize="13sp" />
+             </LinearLayout>
+ 
+             <TextView
+                 android:id="@+id/nobiPermStatusStorage"
++                android:textColor="@color/nobi_secondary_text"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:textSize="13sp" />
+diff --git a/termux-app/app/src/main/res/layout/item_nobi_notification.xml b/termux-app/app/src/main/res/layout/item_nobi_notification.xml
+index 53658d7..a9d548c 100644
+--- a/termux-app/app/src/main/res/layout/item_nobi_notification.xml
++++ b/termux-app/app/src/main/res/layout/item_nobi_notification.xml
+@@ -24,6 +24,7 @@
+ 
+         <TextView
+             android:id="@+id/nobiNotificationTime"
++            android:textColor="@color/nobi_secondary_text"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:textSize="12sp" />
+@@ -38,6 +39,7 @@
+ 
+     <TextView
+         android:id="@+id/nobiNotificationText"
++        android:textColor="@color/nobi_secondary_text"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:layout_marginTop="2dp"

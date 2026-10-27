@@ -1,0 +1,39 @@
+diff --git a/termux-app/app/src/main/AndroidManifest.xml b/termux-app/app/src/main/AndroidManifest.xml
+index f8691d4..c45a92f 100644
+--- a/termux-app/app/src/main/AndroidManifest.xml
++++ b/termux-app/app/src/main/AndroidManifest.xml
+@@ -254,6 +254,7 @@
+         <!-- v7 (37): session recording playback. -->
+         <activity
+             android:name=".app.nobi.NobiPlaybackActivity"
++            android:theme="@style/Theme.NobiHelp.DayNight"
+             android:exported="false"
+             android:label="Playback" />
+ 
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiPlaybackActivity.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiPlaybackActivity.java
+index 563fd31..0b24262 100644
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiPlaybackActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiPlaybackActivity.java
+@@ -8,6 +8,9 @@ import android.widget.TextView;
+ import android.widget.Toast;
+ 
+ import androidx.appcompat.app.AppCompatActivity;
++import androidx.core.content.ContextCompat;
++
++import com.termux.R;
+ 
+ import java.io.BufferedReader;
+ import java.io.File;
+@@ -32,8 +35,12 @@ public class NobiPlaybackActivity extends AppCompatActivity {
+         super.onCreate(savedInstanceState);
+ 
+         scrollView = new ScrollView(this);
++        // v21 w43: terminal-like body: navy background, light mono text, cyan selection.
++        scrollView.setBackgroundColor(ContextCompat.getColor(this, R.color.nobi_navy));
+         textView = new TextView(this);
+         textView.setTypeface(android.graphics.Typeface.MONOSPACE);
++        textView.setTextColor(android.graphics.Color.WHITE);
++        textView.setHighlightColor(ContextCompat.getColor(this, R.color.nobi_cyan_highlight));
+         textView.setTextSize(13);
+         int pad = (int) (12 * getResources().getDisplayMetrics().density);
+         textView.setPadding(pad, pad, pad, pad);
