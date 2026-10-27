@@ -132,14 +132,17 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v4
 
-      # --- Cache key inputs (upstream SHAs, NOT generator branch head, NOT patch list) ---
-      # git ls-remote cheap hai (clone nahi). Upstream badla to key badlegi aur
-      # cache MISS hoga — ye sahi behavior hai (stale bootstrap nahi chalega).
+      # --- Cache key inputs (FROZEN V19 SHAs, NOT latest upstream HEAD) ---
+      # FREEZE (Sam ka order 2026-10-27): builds latest upstream par NAHI
+      # chalenge — V19 ka state hi base hai. Upstream SHAs yahan PIN hain,
+      # isliye cache key hamesha V19 wali hi banti hai aur har build HIT
+      # hota hai (f8f7 seed asset maujood hai). Unfreeze: in do lines ko
+      # wapas ls-remote par le jao (dekho appv19/FREEZE_v19.md).
       - name: Compute bootstrap cache key inputs
         id: bootstrap-key
         run: |
-          PKG_SHA=$(git ls-remote https://github.com/termux/termux-packages HEAD | cut -f1)
-          APP_SHA=$(git ls-remote https://github.com/termux/termux-app HEAD | cut -f1)
+          PKG_SHA=f8f7bf3d488ab58ed764e2ec21bbe4873eeb8b31
+          APP_SHA=8629e632fcb95da272221be327db653fb24befe9
           echo "packages_sha=$PKG_SHA" >> $GITHUB_OUTPUT
           echo "app_sha=$APP_SHA" >> $GITHUB_OUTPUT
           # Generator ke bootstrap-patches ka hash: app patches (w10/w11/...)
@@ -157,8 +160,8 @@ jobs:
           CACHE_KEY="bootstrap-aarch64-${PKG_SHA:0:12}-${APP_SHA:0:12}-${PATCH_HASH}-${PKG_LIST_HASH}-${APP_NAME}${SUFFIX}"
           echo "cache_key=$CACHE_KEY" >> $GITHUB_OUTPUT
           echo "Bootstrap cache key: $CACHE_KEY"
-          echo "Upstream termux-packages HEAD: $PKG_SHA"
-          echo "Upstream termux-app HEAD: $APP_SHA"
+          echo "Upstream termux-packages (FROZEN V19): $PKG_SHA"
+          echo "Upstream termux-app (FROZEN V19): $APP_SHA"
 
       # --- Bootstrap cache restore (PRIMARY: Release asset, tag bootstrap-cache-test) ---
       # Release asset branch-scoped nahi hai, isliye koi bhi branch use kar sakta hai.
