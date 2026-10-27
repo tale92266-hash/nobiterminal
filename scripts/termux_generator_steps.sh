@@ -75,6 +75,18 @@ download() {
         git clone --depth 1 https://github.com/termux/termux-am-library.git             termux-apps-main/termux-am-library
         mv termux-apps-main/termux-am-library/termux-am-library/                        termux-apps-main/termux-app/termux-am-library
         rm -rf                                                                          termux-apps-main/termux-am-library/
+        # FREEZE (Sam ka order 2026-10-27): V19 ka state hi base hai — latest
+        # upstream par build NAHI hoga. Dono repos ko V19 wale exact SHAs par
+        # checkout karo (cache key bhi workflow me inhi SHAs par pin hai, isliye
+        # key hamesha V19 wali banti hai aur har build HIT hota hai). Detached
+        # HEAD theek hai — generator tree ko patch karta hai, commit nahi karta.
+        # NOTE: fetch --depth 1 <sha> GitHub se us commit ko lata hai, chahe wo
+        # HEAD na ho; fail hua to set -e se build turant rukega (galat tree se
+        # chupchaap build nahi banega).
+        git -C termux-packages-main fetch --depth 1 origin f8f7bf3d488ab58ed764e2ec21bbe4873eeb8b31
+        git -C termux-packages-main checkout f8f7bf3d488ab58ed764e2ec21bbe4873eeb8b31
+        git -C termux-apps-main/termux-app fetch --depth 1 origin 8629e632fcb95da272221be327db653fb24befe9
+        git -C termux-apps-main/termux-app checkout 8629e632fcb95da272221be327db653fb24befe9
     else
         git clone --depth 1 https://github.com/termux-play-store/termux-packages.git    termux-packages-main
         git clone --depth 1 https://github.com/termux-play-store/termux-apps.git        termux-apps-main
