@@ -1,0 +1,14 @@
+diff -ruN v18/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt v19/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/editor/CodeEditorView.kt
+@@ -1442,8 +1442,8 @@
+                     if (beforeOk && afterOk) {
+                         val x0 = scrollX + paddingLeft + cl2.getPrimaryHorizontal(idx)
+                         val x1 = scrollX + paddingLeft + cl2.getPrimaryHorizontal(idx + cw.length)
+-                        val y0 = (scrollY + cl2.getLineTop(li)).toFloat()
+-                        val y1 = (scrollY + cl2.getLineBottom(li)).toFloat()
++                        val y0 = (paddingTop + cl2.getLineTop(li)).toFloat()
++                        val y1 = (paddingTop + cl2.getLineBottom(li)).toFloat()
+                         canvas.drawRoundRect(x0, y0, x1, y1, radius2, radius2, wordHlPaint)
+                         drawn2++
+                     }
