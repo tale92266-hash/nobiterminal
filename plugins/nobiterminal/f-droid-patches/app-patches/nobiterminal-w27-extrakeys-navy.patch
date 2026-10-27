@@ -1,0 +1,46 @@
+diff --git a/termux-app/app/src/main/res/values-night/themes.xml b/termux-app/app/src/main/res/values-night/themes.xml
+index e69952b..2ea2182 100644
+--- a/termux-app/app/src/main/res/values-night/themes.xml
++++ b/termux-app/app/src/main/res/values-night/themes.xml
+@@ -32,9 +32,9 @@
+ 
+         <!-- Extra keys colors. -->
+         <item name="extraKeysButtonTextColor">@color/white</item>
+-        <item name="extraKeysButtonActiveTextColor">@color/red_400</item>
+-        <item name="extraKeysButtonBackgroundColor">@color/black</item>
+-        <item name="extraKeysButtonActiveBackgroundColor">@color/grey_500</item>
++        <item name="extraKeysButtonActiveTextColor">@color/nobi_cyan</item>
++        <item name="extraKeysButtonBackgroundColor">@color/nobi_navy</item>
++        <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_key_pressed</item>
+     </style>
+ 
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+index 18ae86d..da9f16f 100644
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -5,4 +5,7 @@
+     <color name="nobi_splash_background">#070B1F</color>
+     <!-- v9: drawer + keys-bar navy, same as the tabs bar (#FF0A0F24). -->
+     <color name="nobi_navy">#FF0A0F24</color>
++    <!-- v20: Nobi cyan (matches notification + splash name) + lighter-navy pressed surface for extra keys. -->
++    <color name="nobi_cyan">#FF22D3EE</color>
++    <color name="nobi_key_pressed">#FF1E2C55</color>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index 55cea84..7696f92 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -59,9 +59,9 @@
+ 
+         <!-- Extra keys colors. -->
+         <item name="extraKeysButtonTextColor">@color/white</item>
+-        <item name="extraKeysButtonActiveTextColor">@color/red_400</item>
+-        <item name="extraKeysButtonBackgroundColor">@color/black</item>
+-        <item name="extraKeysButtonActiveBackgroundColor">@color/grey_500</item>
++        <item name="extraKeysButtonActiveTextColor">@color/nobi_cyan</item>
++        <item name="extraKeysButtonBackgroundColor">@color/nobi_navy</item>
++        <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_key_pressed</item>
+     </style>
+ 
+     <!-- NobiTerminal launch theme: branded splash window background, replaced

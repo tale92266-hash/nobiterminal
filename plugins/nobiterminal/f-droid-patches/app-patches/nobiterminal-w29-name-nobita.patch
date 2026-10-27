@@ -1,0 +1,33 @@
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+index ebd8313..6e03c3c 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/MainActivity.kt
+@@ -8914,7 +8914,7 @@ R.id.action_markdown_preview -> {
+             setSingleLine(true)
+         }
+         val jsonIn = android.widget.EditText(this).apply {
+-            hint = "{\"name\": \"Sam\"}"
++            hint = "{\"name\": \"Nobita\"}"
+             minLines = 6
+             gravity = android.view.Gravity.TOP
+         }
+diff --git a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt
+index a405f65..fe8596a 100644
+--- a/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt
++++ b/termux-app/nobicode/src/main/java/com/nobidev/nobicode/followup/FollowupCheatSheets.kt
+@@ -9,13 +9,13 @@ object FollowupCheatSheets {
+ 
+     val sheets: Map<String, String> = mapOf(
+         "Python" to
+-            "Variables: x = 10 | name = \"Sam\"\n" +
++            "Variables: x = 10 | name = \"Nobita\"\n" +
+             "Print: print(\"Hello\", x)\n" +
+             "If: if x > 5: ... elif ...: ... else: ...\n" +
+             "Loop: for item in items: ... | while x > 0: ...\n" +
+             "Function: def greet(name): return \"Hi \" + name\n" +
+             "List: items = [1, 2, 3] | items.append(4)\n" +
+-            "Dict: user = {\"name\": \"Sam\", \"age\": 20}\n" +
++            "Dict: user = {\"name\": \"Nobita\", \"age\": 20}\n" +
+             "String: text.upper() | text.strip() | text.split(\",\")\n" +
+             "File: with open(\"a.txt\") as f: data = f.read()\n" +
+             "Try: try: ... except Exception as e: ...\n" +

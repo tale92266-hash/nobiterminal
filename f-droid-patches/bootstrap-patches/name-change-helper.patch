@@ -24,7 +24,7 @@
 +		'\033[1;38;5;39m█ ██ █ █    █ █████    █     █   ██████\033[0m' \
 +		'\033[1;38;5;45m█  ███ █    █ █    █   █     █   █    █\033[0m' \
 +		'\033[1;38;5;51m█    █  ████  █████  █████   █   █    █\033[0m' \
-+		'\033[1;38;5;141m   Welcome back, Sam.\033[0m' \
++		'\033[1;38;5;141m   Welcome back, Nobita.\033[0m' \
 +		'\033[38;5;51m   Your terminal. Your rules.\033[0m' > motds/motd
 +	cat >> termux-login.sh.in <<'NOBI_LOGIN_EOF'
 +
@@ -35,7 +35,7 @@
 +12|1[3-6]) _nobi_greeting="Good afternoon" ;;
 +*) _nobi_greeting="Good evening" ;;
 +esac
-+printf '\033[1;38;5;141m%s, Sam.\033[0m\n' "$_nobi_greeting"
++printf '\033[1;38;5;141m%s, Nobita.\033[0m\n' "$_nobi_greeting"
 +unset _nobi_hour _nobi_greeting
 +NOBI_LOGIN_EOF
  	autoreconf -vfi

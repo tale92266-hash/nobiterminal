@@ -1,0 +1,191 @@
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+index ed85764..a3aaca6 100644
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -118,6 +118,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_new_window"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -132,7 +133,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_new_window"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -145,6 +146,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_nobicode"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -159,7 +161,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_code"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -172,6 +174,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_new_session"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -186,7 +189,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_new_session"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -200,6 +203,7 @@
+                     <!-- v6 batch 1-16: terminal tools. -->
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_quick_commands"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -214,7 +218,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_terminal"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -227,6 +231,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_find"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -241,7 +246,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_search"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -254,6 +259,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_server"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -268,7 +274,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_server"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -281,6 +287,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_session_tools"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -295,7 +302,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_tools"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -309,6 +316,7 @@
+                     <!-- v7 (58): terminal output → editor. -->
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_output_editor"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -323,7 +331,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_terminal"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -336,6 +344,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_permissions"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -350,7 +359,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/nobi_ic_shield"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -363,6 +372,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_settings"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -377,7 +387,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_settings"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+@@ -390,6 +400,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_exit"
++                        android:background="?attr/selectableItemBackground"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:gravity="center_vertical"
+@@ -404,7 +415,7 @@
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+                             android:src="@drawable/ic_nobi_exit"
+-                            app:tint="?attr/termuxActivityDrawerImageTint" />
++                            app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
