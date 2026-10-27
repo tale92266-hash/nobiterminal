@@ -1,0 +1,130 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+index 9e275a8..7e77632 100644
+--- a/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/activities/SettingsActivity.java
+@@ -23,6 +23,7 @@ import com.termux.app.TermuxActivity;
+ import com.termux.app.TermuxService;
+ import com.termux.shared.activities.ReportActivity;
+ import com.termux.shared.file.FileUtils;
++import com.termux.shared.markdown.MarkdownUtils;
+ import com.termux.shared.models.ReportInfo;
+ import com.termux.app.models.UserAction;
+ import com.termux.app.nobi.NobiTerminalUtils;
+@@ -235,8 +236,31 @@ public class SettingsActivity extends AppCompatActivity {
+                         public void run() {
+                             String title = "About";
+ 
++                            // v22 w45: About page header for NobiTerminal itself: app
++                            // v22 w45: description, prominent Termux credit, and curated
++                            // v22 w45: Termux links. URLs come only from TermuxConstants
++                            // v22 w45: (the same constants getImportantLinksMarkdownString
++                            // v22 w45: uses); links open via Markwon's default ACTION_VIEW
++                            // v22 w45: handling in ReportActivity. The app-info, device-info
++                            // v22 w45: and important-links blocks below are unchanged, so the
++                            // v22 w45: version info stays exactly as already reported.
++                            StringBuilder aboutHeader = new StringBuilder();
++                            aboutHeader.append("# ").append(TermuxConstants.TERMUX_APP_NAME).append(" \u2728\n");
++                            aboutHeader.append("\n").append(TermuxConstants.TERMUX_APP_NAME).append(" is a terminal app based on Termux, with its own apt repositories and the Nobi theme.\n");
++                            aboutHeader.append("\n## Thanks \uD83D\uDE4F\n");
++                            aboutHeader.append("\nThanks, and all credit goes to Termux and its developers.\n");
++                            aboutHeader.append("\n## Termux Links\n");
++                            aboutHeader.append("\n").append(MarkdownUtils.getLinkMarkdownString("Termux website", TermuxConstants.TERMUX_SITE_URL)).append("  ");
++                            aboutHeader.append("\n").append(MarkdownUtils.getLinkMarkdownString("Termux on GitHub", TermuxConstants.TERMUX_GITHUB_REPO_URL)).append("  ");
++                            aboutHeader.append("\n").append(MarkdownUtils.getLinkMarkdownString("Termux packages on GitHub", TermuxConstants.TERMUX_PACKAGES_GITHUB_REPO_URL)).append("  ");
++                            aboutHeader.append("\n").append(MarkdownUtils.getLinkMarkdownString("Termux Wiki", TermuxConstants.TERMUX_WIKI_URL)).append("  ");
++                            aboutHeader.append("\n").append(MarkdownUtils.getLinkMarkdownString("Termux support email", TermuxConstants.TERMUX_SUPPORT_EMAIL_MAILTO_URL)).append("  ");
++                            aboutHeader.append("\n").append(MarkdownUtils.getLinkMarkdownString("r/termux on Reddit", TermuxConstants.TERMUX_REDDIT_SUBREDDIT_URL)).append("  ");
++                            aboutHeader.append("\n##\n");
++
+                             StringBuilder aboutString = new StringBuilder();
+-                            aboutString.append(TermuxUtils.getAppInfoMarkdownString(context, TermuxUtils.AppInfoMode.TERMUX_AND_PLUGIN_PACKAGES));
++                            aboutString.append(aboutHeader.toString());
++                            aboutString.append("\n\n").append(TermuxUtils.getAppInfoMarkdownString(context, TermuxUtils.AppInfoMode.TERMUX_AND_PLUGIN_PACKAGES));
+                             aboutString.append("\n\n").append(AndroidUtils.getDeviceInfoMarkdownString(context, true));
+                             aboutString.append("\n\n").append(TermuxUtils.getImportantLinksMarkdownString(context));
+ 
+diff --git a/termux-app/app/src/main/res/values-night/themes.xml b/termux-app/app/src/main/res/values-night/themes.xml
+index 68603c4..6d08d1c 100644
+--- a/termux-app/app/src/main/res/values-night/themes.xml
++++ b/termux-app/app/src/main/res/values-night/themes.xml
+@@ -59,4 +59,25 @@
+         <item name="android:textColorSecondary">@color/nobi_secondary_text</item>
+     </style>
+ 
++    <!-- v22 w45: night twin of Theme.NobiReport.DayNight, following the
++         w31 NobiSettings precedent: a style in values-night/ REPLACES the
++         values/ definition wholesale at night, so this repeats the navy
++         chrome + body items and adds cyan links, which pass contrast only
++         at night (9.79:1 on the night body; 1.67:1 in day mode, hence no
++         cyan link in the day twin). -->
++    <style name="Theme.NobiReport.DayNight" parent="Theme.TermuxApp.DayNight.NoActionBar">
++        <item name="colorPrimary">@color/nobi_navy</item>
++        <item name="colorPrimaryVariant">@color/nobi_navy</item>
++        <item name="colorPrimaryDark">@color/nobi_navy</item>
++        <item name="colorOnPrimary">@color/white</item>
++        <item name="android:statusBarColor">@color/nobi_navy</item>
++        <item name="colorSecondary">@color/nobi_cyan</item>
++        <item name="colorControlActivated">@color/nobi_cyan</item>
++        <item name="android:windowBackground">@color/nobi_body_surface</item>
++        <item name="android:colorBackground">@color/nobi_body_surface</item>
++        <item name="colorSurface">@color/nobi_body_surface</item>
++        <item name="android:textColorSecondary">@color/nobi_secondary_text</item>
++        <item name="android:textColorLink">@color/nobi_cyan</item>
++    </style>
++
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+index 368d288..59240be 100644
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -55,6 +55,14 @@
+         <item name="android:statusBarColor">@color/nobi_navy</item>
+         <item name="colorSecondary">@color/nobi_cyan</item>
+         <item name="colorControlActivated">@color/nobi_cyan</item>
++        <!-- v22 w45: Nobi-tinted body + Nobi-hue secondary text (w31 tokens).
++             Day-mode links keep the inherited blue (#0969DA, 4.81:1 on the day
++             body): cyan links fail contrast in day mode (1.67:1), so cyan links
++             live only in the values-night twin of this style. -->
++        <item name="android:windowBackground">@color/nobi_body_surface</item>
++        <item name="android:colorBackground">@color/nobi_body_surface</item>
++        <item name="colorSurface">@color/nobi_body_surface</item>
++        <item name="android:textColorSecondary">@color/nobi_secondary_text</item>
+     </style>
+ 
+ 
+diff --git a/termux-app/termux-shared/src/main/java/com/termux/shared/activities/ReportActivity.java b/termux-app/termux-shared/src/main/java/com/termux/shared/activities/ReportActivity.java
+index 083d517..04a8f54 100644
+--- a/termux-app/termux-shared/src/main/java/com/termux/shared/activities/ReportActivity.java
++++ b/termux-app/termux-shared/src/main/java/com/termux/shared/activities/ReportActivity.java
+@@ -81,6 +81,17 @@ public class ReportActivity extends AppCompatActivity {
+         Toolbar toolbar = findViewById(R.id.toolbar);
+         if (toolbar != null) {
+             setSupportActionBar(toolbar);
++            // v22 w45: functional back arrow on the navy toolbar, exactly like
++            // v22 w45: SettingsActivity (v17): show the up affordance, keep the
++            // v22 w45: title white, and tint the navigation icon white in both
++            // v22 w45: modes. The arrow is the real ActionBar up drawable, never
++            // v22 w45: an emoji. Applies to every ReportActivity screen (About,
++            // v22 w45: issue reports, crash/plugin reports), as w41's navy
++            // v22 w45: toolbar already did.
++            AppCompatActivityUtils.setShowBackButtonInActionBar(this, true);
++            toolbar.setTitleTextColor(android.graphics.Color.WHITE);
++            android.graphics.drawable.Drawable navIcon = toolbar.getNavigationIcon();
++            if (navIcon != null) navIcon.mutate().setTint(android.graphics.Color.WHITE);
+         }
+ 
+         mBundle = null;
+@@ -209,6 +220,13 @@ public class ReportActivity extends AppCompatActivity {
+         finishAndRemoveTask();
+     }
+ 
++    @Override
++    public boolean onSupportNavigateUp() {
++        // v22 w45: toolbar back arrow navigates back exactly like SettingsActivity.
++        onBackPressed();
++        return true;
++    }
++
+     @Override
+     public boolean onOptionsItemSelected(final MenuItem item) {
+         int id = item.getItemId();
