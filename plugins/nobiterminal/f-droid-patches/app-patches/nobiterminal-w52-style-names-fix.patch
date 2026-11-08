@@ -1,0 +1,149 @@
+diff --git a/termux-app/app/src/main/res/values/nobi_ds_styles.xml b/termux-app/app/src/main/res/values/nobi_ds_styles.xml
+--- a/termux-app/app/src/main/res/values/nobi_ds_styles.xml
++++ b/termux-app/app/src/main/res/values/nobi_ds_styles.xml
+@@ -2,7 +2,7 @@
+ <resources>
+     <!-- v24 w47: design-system styles (spec Phase 1). Applied by the
+          w48/w49 layout patches; kept separate from upstream styles.xml. -->
+-    <style name="NobiDs.DrawerRow">
++    <style name="NobiDsDrawerRow">
+         <item name="android:minHeight">@dimen/nobi_ds_drawer_item_height</item>
+         <item name="android:paddingTop">15dp</item>
+         <item name="android:paddingBottom">15dp</item>
+@@ -11,7 +11,7 @@
+         <item name="android:background">?attr/selectableItemBackground</item>
+         <item name="android:gravity">center_vertical</item>
+     </style>
+-    <style name="NobiDs.DrawerSectionLabel">
++    <style name="NobiDsDrawerSectionLabel">
+         <item name="android:textSize">12sp</item>
+         <item name="android:textStyle">bold</item>
+         <item name="android:textColor">@color/nobi_ds_drawer_text_secondary</item>
+@@ -21,11 +21,11 @@
+         <item name="android:paddingTop">@dimen/nobi_ds_spacing_16</item>
+         <item name="android:paddingBottom">@dimen/nobi_ds_spacing_8</item>
+     </style>
+-    <style name="NobiDs.ToolbarTitle">
++    <style name="NobiDsToolbarTitle">
+         <item name="android:textSize">20sp</item>
+         <item name="android:textColor">@color/nobi_ds_text_primary</item>
+     </style>
+-    <style name="NobiDs.ToolbarSubtitle">
++    <style name="NobiDsToolbarSubtitle">
+         <item name="android:textSize">12sp</item>
+         <item name="android:textColor">@color/nobi_ds_text_secondary</item>
+     </style>
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -169,7 +169,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_new_session"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -191,7 +191,7 @@
+                     </LinearLayout>
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_new_window"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -214,7 +214,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_nobicode"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -239,7 +239,7 @@
+                     <!-- v6 batch 1-16: terminal tools. -->
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_quick_commands"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -262,7 +262,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_find"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -285,7 +285,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_server"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -308,7 +308,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_session_tools"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -332,7 +332,7 @@
+                     <!-- v7 (58): terminal output → editor. -->
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_output_editor"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -355,7 +355,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_permissions"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -378,7 +378,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_settings"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+@@ -401,7 +401,7 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_exit"
+-                        style="@style/NobiDs.DrawerRow"
++                        style="@style/NobiDsDrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+                         android:orientation="horizontal">
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -1948,7 +1948,7 @@
+             if (firstVisible < 0) continue;
+             android.widget.TextView label = new android.widget.TextView(this);
+             label.setText(group[0]);
+-            label.setTextAppearance(this, R.style.NobiDs_DrawerSectionLabel);
++            label.setTextAppearance(this, R.style.NobiDsDrawerSectionLabel);
+             int p16 = getResources().getDimensionPixelSize(R.dimen.nobi_ds_spacing_16);
+             int p8 = getResources().getDimensionPixelSize(R.dimen.nobi_ds_spacing_8);
+             label.setPadding(p16, p16, p16, p8);
