@@ -1,0 +1,45 @@
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -1709,7 +1709,6 @@
+             .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                 nobiV7Prefs().edit().putString("accent", hexes[which]).apply();
+                 if (mNobiTabsController != null) mNobiTabsController.refreshTabs();
+-                applyNobiFabTint();
+                 applyNobiBottomBarTint();
+                 dialog.dismiss();
+             })
+@@ -1756,15 +1755,6 @@
+             Toast.LENGTH_SHORT).show();
+     }
+ 
+-    private void toggleNobiFab() {
+-        boolean on = !nobiV7Prefs().getBoolean("fab", true);
+-        nobiV7Prefs().edit().putBoolean("fab", on).apply();
+-        applyNobiFabVisibility();
+-        Toast.makeText(this, getString(R.string.nobi_tool_fab) + ": "
+-            + (on ? getString(R.string.nobi_on) : getString(R.string.nobi_off)),
+-            Toast.LENGTH_SHORT).show();
+-    }
+-
+     private void applyNobiBottomBarVisibility() {
+         View bar = findViewById(R.id.nobi_bottom_bar);
+         if (bar != null) {
+@@ -2367,7 +2357,6 @@
+             getString(R.string.nobi_tool_density),
+             getString(R.string.nobi_tool_glass),
+             getString(R.string.nobi_tool_bottom_bar),
+-            getString(R.string.nobi_tool_fab),
+             getString(R.string.nobi_tool_drawer_customize),
+             getString(R.string.nobi_tool_terminal_font)};
+         new AlertDialog.Builder(this)
+@@ -2432,9 +2421,6 @@
+                         toggleNobiBottomBar();
+                         break;
+                     case 19:
+-                        toggleNobiFab();
+-                        break;
+-                    case 20:
+                         showNobiDrawerCustomizeDialog();
+                         break;
+                     default:
