@@ -1,0 +1,482 @@
+--- a/termux-app/app/src/main/java/com/termux/app/nobi/NobiRepoSetup.java
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiRepoSetup.java
+@@ -1,61 +1,76 @@
+ package com.termux.app.nobi;
+ 
++import android.app.Activity;
++import android.app.AlertDialog;
+ import android.content.Context;
++import android.content.Intent;
++import android.content.SharedPreferences;
++import android.net.Uri;
++import android.os.Build;
+ 
++import com.termux.R;
++import com.termux.app.TermuxService;
+ import com.termux.shared.logger.Logger;
+-import com.termux.shared.shell.command.ExecutionCommand;
+ import com.termux.shared.shell.command.ExecutionCommand.Runner;
+-import com.termux.shared.shell.command.runner.app.AppShell;
+ import com.termux.shared.termux.TermuxConstants;
+-import com.termux.shared.termux.shell.TermuxShellManager;
+-import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment;
++import com.termux.shared.termux.TermuxConstants.TERMUX_APP.TERMUX_SERVICE;
+ 
+ import java.io.ByteArrayOutputStream;
+ import java.io.File;
+ import java.io.FileInputStream;
+ import java.io.FileOutputStream;
+ import java.io.IOException;
++import java.lang.ref.WeakReference;
+ import java.nio.charset.StandardCharsets;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.concurrent.atomic.AtomicBoolean;
+ 
+ /**
+- * v12: "Auto repo setup on app open".
++ * v23: "Auto repo setup on app open" — all ten Nobi repos, visible apt update.
+  *
+  * On app open, after bootstrap is complete, makes sure the NobiTerminal
+  * apt repositories are configured, without ever blocking the UI thread
+  * and without depending on the manual one-paste setup block:
+  *
+- * - $PREFIX/etc/apt/sources.list.d/nobi1.list, nobi2.list, nobi3.list
+- *   must contain exactly the NobiTerminal repo lines below. Only a file
+- *   that is missing or whose content differs is (re)written.
++ * - $PREFIX/etc/apt/sources.list.d/nobi1.list .. nobi10.list must contain
++ *   exactly the NobiTerminal repo lines below. Only a file that is missing
++ *   or whose content differs is (re)written. Repo-9 and repo-10 do not
++ *   exist yet; their lists are still written now, so the day those repos
++ *   are created `apt update` picks them up with no app update.
+  * - Lines in $PREFIX/etc/apt/sources.list that serve the official
+  *   Termux repositories (whose debs carry com.termux paths and can
+  *   never install under NobiTerminal) are commented out with '#'.
+  *   Before that first rewrite, the original file is copied to
+  *   sources.list.nobi-backup; an existing backup is never overwritten.
+- *   No other file in sources.list.d is touched, and in sources.list
+- *   only official Termux lines are touched.
++ * - NEW in v23: official Termux lines in any other *.list file under
++ *   sources.list.d (except the nobi files themselves) are commented out
++ *   the same way. Those files are never deleted and no backup is made
++ *   for them — the lines are only commented, so removing the '#' brings
++ *   them back.
+  *
+- * State is derived from the files themselves on every open: if all
+- * three nobi files are already correct and no official Termux line is
+- * left uncommented, nothing is written and no `apt update` runs, so a
+- * normal app open costs only three small file reads.
++ * State is derived from the files themselves on every open, plus one
++ * boolean preference (apt update done): if all ten nobi files are already
++ * correct, no official Termux line is left uncommented anywhere, and a
++ * previous apt update already succeeded, nothing is written and no
++ * `apt update` runs, so a normal app open costs only a few small reads.
+  *
+- * If anything was fixed, `apt update` runs once on the same background
+- * thread, through the codebase's own background-command pattern
+- * (AppShell.execute with a TermuxShellEnvironment, which supplies the
+- * correct PREFIX, PATH, HOME and TMPDIR — see TermuxService
+- * createTermuxTask and TermuxUtils apt-info). It is failure tolerant:
+- * a missing apt binary, an offline device, or a non-zero exit code is
+- * only logged; nothing crashes and the next app open retries, because
+- * the files are re-checked from scratch.
++ * When anything was fixed (or a previous apt update never succeeded),
++ * `apt update` runs VISIBLY: a new terminal session opens running a
++ * small setup script that prints the setup steps and the live apt output,
++ * exactly like the user running the command themselves. The script
++ * retries a failed update 3 times on its own (5s, 15s, 30s gaps) and
++ * reports the outcome back through marker files in $PREFIX/tmp. A
++ * repo-9/10 404 is NOT a failure: the update counts as done as soon as
++ * any Nobi repo index is fetched or confirmed current (a Hit:/Get: line
++ * for tale92266-hash.github.io in the apt output). If all three retries
++ * fail, a Retry / Later dialog is shown; Retry re-runs the whole setup,
++ * Later dismisses it and the next app open retries.
+  *
+- * No new dependency, no existing preference key is changed, and no
+- * user-visible text is shown by this class (any text it logs is
+- * English). This class is the dex marker for the feature: its name,
+- * NobiRepoSetup, is what a later dex check should look for.
++ * No new dependency, no existing preference key is changed, and every
++ * user-visible string is English (string resources). This class is the
++ * dex marker for the feature: its name, NobiRepoSetup, is what a later
++ * dex check should look for.
+  */
+ public final class NobiRepoSetup {
+ 
+@@ -67,13 +82,27 @@
+     private static final String[] NOBI_FILE_NAMES = {
+         "nobi1.list",
+         "nobi2.list",
+-        "nobi3.list"
++        "nobi3.list",
++        "nobi4.list",
++        "nobi5.list",
++        "nobi6.list",
++        "nobi7.list",
++        "nobi8.list",
++        "nobi9.list",
++        "nobi10.list"
+     };
+ 
+     private static final String[] NOBI_FILE_LINES = {
+         "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo ./",
+         "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-2 ./",
+-        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-3 ./"
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-3 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-4 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-5 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-6 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-7 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-8 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-9 ./",
++        "deb [trusted=yes] https://tale92266-hash.github.io/nobiterminal-repo-10 ./"
+     };
+ 
+     /** Host/path fragments that identify an official Termux apt source. */
+@@ -85,6 +114,22 @@
+ 
+     private static final String BACKUP_FILE_NAME = "sources.list.nobi-backup";
+ 
++    /** Private preferences: only the apt-update-done flag lives here. */
++    private static final String PREFS_NAME = "NobiRepoSetup";
++    private static final String PREF_APT_UPDATE_DONE = "apt_update_done";
++
++    /** Setup script + outcome markers, all under $PREFIX/tmp. */
++    private static final String SETUP_SCRIPT_NAME = "nobi-repo-setup.sh";
++    private static final String DONE_MARKER_NAME = "nobi-apt-update-done";
++    private static final String FAILED_MARKER_NAME = "nobi-apt-update-failed";
++
++    /** Visible session name shown in the terminal session drawer. */
++    private static final String SESSION_SHELL_NAME = "Nobi Repo Setup";
++
++    /** How long the background run waits for the visible session to report. */
++    private static final long APT_UPDATE_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
++    private static final long APT_UPDATE_POLL_INTERVAL_MS = 2000;
++
+     private NobiRepoSetup() {
+     }
+ 
+@@ -100,12 +145,17 @@
+         if (!RUNNING.compareAndSet(false, true)) return;
+         Context rawAppContext = context.getApplicationContext();
+         final Context appContext = rawAppContext != null ? rawAppContext : context;
++        final WeakReference<Activity> activityRef =
++            context instanceof Activity ? new WeakReference<>((Activity) context) : null;
+         new Thread() {
+             @Override
+             public void run() {
+                 try {
+                     boolean changed = ensureRepoFiles();
+-                    if (changed) runAptUpdate(appContext);
++                    boolean aptDone = isAptUpdateDone(appContext);
++                    if (changed || !aptDone) {
++                        runVisibleAptUpdate(appContext, activityRef);
++                    }
+                 } catch (Exception e) {
+                     Logger.logError(LOG_TAG, "Auto repo setup failed: " + e.getMessage());
+                 } finally {
+@@ -117,8 +167,9 @@
+ 
+     /**
+      * Writes only the nobi files that are missing/wrong and comments out
+-     * only official Termux lines in sources.list. Returns true if any
+-     * file was actually changed.
++     * only official Termux lines in sources.list and in non-nobi *.list
++     * files under sources.list.d. Returns true if any file was actually
++     * changed.
+      */
+     private static boolean ensureRepoFiles() {
+         boolean changed = false;
+@@ -143,22 +194,33 @@
+             }
+         }
+ 
+-        if (commentOutOfficialTermuxLines(new File(aptDir, "sources.list"))) changed = true;
++        if (commentOutOfficialTermuxLines(new File(aptDir, "sources.list"), true)) changed = true;
++
++        File[] listFiles = sourcesListDir.listFiles();
++        if (listFiles != null) {
++            for (File file : listFiles) {
++                if (!file.isFile()) continue;
++                if (!file.getName().endsWith(".list")) continue;
++                if (file.getName().startsWith("nobi")) continue;
++                if (commentOutOfficialTermuxLines(file, false)) changed = true;
++            }
++        }
+         return changed;
+     }
+ 
+     /**
+-     * Comments out uncommented official Termux lines in sources.list.
+-     * Returns true only if the file was actually rewritten. The original
+-     * is backed up to sources.list.nobi-backup first, but only when no
+-     * backup exists yet and only when a rewrite is really needed; if the
+-     * backup cannot be made, the original is left untouched rather than
+-     * rewritten without a way back. Other lines and every other file in
+-     * sources.list.d are left exactly as they are.
++     * Comments out uncommented official Termux lines in the given sources
++     * file. Returns true only if the file was actually rewritten. When
++     * backupFirst is true (only for sources.list itself), the original is
++     * backed up to sources.list.nobi-backup first, but only when no backup
++     * exists yet and only when a rewrite is really needed; if the backup
++     * cannot be made, the original is left untouched rather than rewritten
++     * without a way back. Other lines in the file are left exactly as
++     * they are, and the file is never deleted.
+      */
+-    private static boolean commentOutOfficialTermuxLines(File sourcesList) {
+-        if (sourcesList == null || !sourcesList.isFile()) return false;
+-        String content = readFile(sourcesList);
++    private static boolean commentOutOfficialTermuxLines(File sourcesFile, boolean backupFirst) {
++        if (sourcesFile == null || !sourcesFile.isFile()) return false;
++        String content = readFile(sourcesFile);
+         if (content == null) return false;
+         String[] lines = content.split("\n", -1);
+         boolean needsChange = false;
+@@ -170,13 +232,15 @@
+         }
+         if (!needsChange) return false;
+ 
+-        File backup = new File(sourcesList.getParentFile(), BACKUP_FILE_NAME);
+-        if (!backup.exists()) {
+-            try {
+-                copyFile(sourcesList, backup);
+-            } catch (IOException e) {
+-                Logger.logError(LOG_TAG, "Cannot back up sources.list, leaving it unchanged: " + e.getMessage());
+-                return false;
++        if (backupFirst) {
++            File backup = new File(sourcesFile.getParentFile(), BACKUP_FILE_NAME);
++            if (!backup.exists()) {
++                try {
++                    copyFile(sourcesFile, backup);
++                } catch (IOException e) {
++                    Logger.logError(LOG_TAG, "Cannot back up sources.list, leaving it unchanged: " + e.getMessage());
++                    return false;
++                }
+             }
+         }
+ 
+@@ -194,9 +258,9 @@
+             out.append("\n");
+         }
+         try {
+-            writeFile(sourcesList, out.toString());
++            writeFile(sourcesFile, out.toString());
+         } catch (IOException e) {
+-            Logger.logError(LOG_TAG, "Cannot rewrite sources.list: " + e.getMessage());
++            Logger.logError(LOG_TAG, "Cannot rewrite " + sourcesFile.getName() + ": " + e.getMessage());
+             return false;
+         }
+         return true;
+@@ -218,42 +282,171 @@
+         return false;
+     }
+ 
++    private static boolean isAptUpdateDone(Context appContext) {
++        try {
++            SharedPreferences prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
++            return prefs.getBoolean(PREF_APT_UPDATE_DONE, false);
++        } catch (Exception e) {
++            return false;
++        }
++    }
++
++    private static void setAptUpdateDone(Context appContext, boolean done) {
++        try {
++            SharedPreferences prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
++            prefs.edit().putBoolean(PREF_APT_UPDATE_DONE, done).apply();
++        } catch (Exception e) {
++            Logger.logError(LOG_TAG, "Cannot save apt update state: " + e.getMessage());
++        }
++    }
++
+     /**
+-     * Runs `apt update` on the calling (background) thread through the
+-     * codebase's AppShell pattern, so the correct PREFIX environment is
+-     * supplied by TermuxShellEnvironment. Any failure — including
+-     * offline — is only logged; the next app open retries.
++     * Runs `apt update` VISIBLY in a new terminal session (the codebase's
++     * own TermuxService terminal-session path, the same one the
++     * RUN_COMMAND intent uses), then waits on the background thread for
++     * the script's outcome markers. On success the apt-done flag is set;
++     * on failure the flag stays clear and a Retry / Later dialog is shown
++     * on the UI thread. If the session is dismissed or never reports
++     * within the timeout, the flag stays clear so the next app open
++     * retries — nothing is claimed as done that was not observed done.
+      */
+-    private static void runAptUpdate(Context appContext) {
++    private static void runVisibleAptUpdate(Context appContext, WeakReference<Activity> activityRef) {
++        File tmpDir = new File(TermuxConstants.TERMUX_TMP_PREFIX_DIR_PATH);
++        if (!tmpDir.isDirectory() && !tmpDir.mkdirs()) {
++            Logger.logError(LOG_TAG, "Cannot create tmp directory, apt update skipped");
++            return;
++        }
++        File scriptFile = new File(tmpDir, SETUP_SCRIPT_NAME);
++        File doneMarker = new File(tmpDir, DONE_MARKER_NAME);
++        File failedMarker = new File(tmpDir, FAILED_MARKER_NAME);
+         try {
+-            String aptPath = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/apt";
+-            if (!new File(aptPath).isFile()) {
+-                Logger.logError(LOG_TAG, "apt binary not found, skipping apt update");
+-                return;
+-            }
+-            ExecutionCommand executionCommand = new ExecutionCommand(
+-                TermuxShellManager.getNextShellId(), aptPath,
+-                new String[]{"update"}, null,
+-                TermuxConstants.TERMUX_HOME_DIR_PATH,
+-                Runner.APP_SHELL.getName(), false);
+-            executionCommand.commandLabel = "Nobi Repo Setup apt update";
+-            executionCommand.setShellCommandShellEnvironment = true;
+-            executionCommand.backgroundCustomLogLevel = Logger.LOG_LEVEL_OFF;
+-            // Synchronous on this background thread (the TermuxUtils
+-            // apt-info pattern): the UI thread is never involved, and
+-            // the RUNNING guard is released in ensureAsync's finally
+-            // block as soon as apt finishes, whatever its exit code.
+-            AppShell appShell = AppShell.execute(appContext, executionCommand,
+-                null, new TermuxShellEnvironment(), null, true);
+-            if (appShell == null) {
+-                Logger.logError(LOG_TAG, "apt update could not be started, will retry on next app open");
++            writeFile(scriptFile, buildSetupScript());
++        } catch (IOException e) {
++            Logger.logError(LOG_TAG, "Cannot write setup script, apt update skipped: " + e.getMessage());
++            return;
++        }
++
++        String shPath = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/sh";
++        if (!new File(shPath).isFile()) {
++            Logger.logError(LOG_TAG, "sh binary not found, apt update skipped");
++            return;
++        }
++
++        Uri executableUri = new Uri.Builder()
++            .scheme(TERMUX_SERVICE.URI_SCHEME_SERVICE_EXECUTE)
++            .path(shPath).build();
++        Intent execIntent = new Intent(TERMUX_SERVICE.ACTION_SERVICE_EXECUTE, executableUri);
++        execIntent.setClass(appContext, TermuxService.class);
++        execIntent.putExtra(TERMUX_SERVICE.EXTRA_ARGUMENTS, new String[]{scriptFile.getAbsolutePath()});
++        execIntent.putExtra(TERMUX_SERVICE.EXTRA_RUNNER, Runner.TERMINAL_SESSION.getName());
++        execIntent.putExtra(TERMUX_SERVICE.EXTRA_SHELL_NAME, SESSION_SHELL_NAME);
++        execIntent.putExtra(TERMUX_SERVICE.EXTRA_COMMAND_LABEL, "Nobi Repo Setup apt update");
++        // No EXTRA_SESSION_ACTION: TermuxService defaults to switching to
++        // the new session and opening the activity, so the user sees it.
++        try {
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                appContext.startForegroundService(execIntent);
+             } else {
+-                Logger.logDebug(LOG_TAG, "apt update finished with exit code "
+-                    + executionCommand.resultData.exitCode);
++                appContext.startService(execIntent);
+             }
+         } catch (Exception e) {
+-            Logger.logError(LOG_TAG, "apt update failed, will retry on next app open: " + e.getMessage());
++            Logger.logError(LOG_TAG, "Cannot start visible apt update, will retry on next app open: " + e.getMessage());
++            return;
++        }
++
++        long deadline = System.currentTimeMillis() + APT_UPDATE_WAIT_TIMEOUT_MS;
++        while (System.currentTimeMillis() < deadline) {
++            if (doneMarker.exists()) {
++                setAptUpdateDone(appContext, true);
++                Logger.logDebug(LOG_TAG, "apt update finished");
++                return;
++            }
++            if (failedMarker.exists()) {
++                setAptUpdateDone(appContext, false);
++                Logger.logError(LOG_TAG, "apt update failed after retries, showing retry dialog");
++                showRetryDialog(activityRef);
++                return;
++            }
++            try {
++                Thread.sleep(APT_UPDATE_POLL_INTERVAL_MS);
++            } catch (InterruptedException e) {
++                Thread.currentThread().interrupt();
++                return;
++            }
+         }
++        Logger.logError(LOG_TAG, "apt update outcome unknown after timeout, will retry on next app open");
++        setAptUpdateDone(appContext, false);
++    }
++
++    /**
++     * The setup script the visible session runs. It prints the setup
++     * steps, runs `apt update` where the user can see the live output,
++     * and retries a failed update 3 times (5s, 15s, 30s gaps). Success is
++     * a Hit:/Get: line for a Nobi repo in the apt output — a 404 from the
++     * not-yet-created repo-9/10 is NOT a failure, but an update that
++     * fetched no Nobi index at all is. The outcome is reported back
++     * through the done/failed marker files.
++     */
++    private static String buildSetupScript() {
++        StringBuilder script = new StringBuilder();
++        script.append("#!/bin/sh\n");
++        script.append("# v23: visible Nobi repo setup + apt update with retries.\n");
++        script.append("# The repo list files were already written by NobiRepoSetup; this script\n");
++        script.append("# only shows the steps and runs apt update where the user can see it.\n");
++        script.append("MARKER_DIR=\"$PREFIX/tmp\"\n");
++        script.append("rm -f \"$MARKER_DIR/nobi-apt-update-done\" \"$MARKER_DIR/nobi-apt-update-failed\"\n");
++        script.append("echo \"NobiTerminal: Nobi sources set (10 lists).\"\n");
++        script.append("echo \"NobiTerminal: Official Termux sources disabled.\"\n");
++        script.append("if ! command -v apt >/dev/null 2>&1; then\n");
++        script.append("  echo \"NobiTerminal: apt update failed - apt not found.\"\n");
++        script.append("  touch \"$MARKER_DIR/nobi-apt-update-failed\"\n");
++        script.append("  exit 1\n");
++        script.append("fi\n");
++        script.append("echo \"NobiTerminal: Running apt update...\"\n");
++        script.append("LOG=\"$MARKER_DIR/nobi-apt-update.log\"\n");
++        script.append("attempt=1\n");
++        script.append("while [ $attempt -le 4 ]; do\n");
++        script.append("  apt update 2>&1 | tee \"$LOG\"\n");
++        script.append("  if grep -qE \"^(Hit|Get):.*tale92266-hash.github.io\" \"$LOG\"; then\n");
++        script.append("    echo \"NobiTerminal: apt update finished.\"\n");
++        script.append("    touch \"$MARKER_DIR/nobi-apt-update-done\"\n");
++        script.append("    exit 0\n");
++        script.append("  fi\n");
++        script.append("  if [ $attempt -eq 4 ]; then break; fi\n");
++        script.append("  case $attempt in\n");
++        script.append("    1) wait=5 ;;\n");
++        script.append("    2) wait=15 ;;\n");
++        script.append("    *) wait=30 ;;\n");
++        script.append("  esac\n");
++        script.append("  echo \"NobiTerminal: apt update failed - retrying $attempt/3 in ${wait}s...\"\n");
++        script.append("  sleep $wait\n");
++        script.append("  attempt=$((attempt + 1))\n");
++        script.append("done\n");
++        script.append("echo \"NobiTerminal: apt update failed - check your connection and tap Retry.\"\n");
++        script.append("touch \"$MARKER_DIR/nobi-apt-update-failed\"\n");
++        script.append("exit 1\n");
++        return script.toString();
++    }
++
++    /**
++     * Shows the Retry / Later dialog on the UI thread after all automatic
++     * retries failed. Retry re-runs the whole setup; Later dismisses and
++     * the next app open retries. Never shown when the activity is gone.
++     */
++    private static void showRetryDialog(WeakReference<Activity> activityRef) {
++        if (activityRef == null) return;
++        Activity activity = activityRef.get();
++        if (activity == null || activity.isFinishing()) return;
++        activity.runOnUiThread(() -> {
++            Activity act = activityRef.get();
++            if (act == null || act.isFinishing()) return;
++            new AlertDialog.Builder(act)
++                .setTitle(R.string.nobi_apt_update_failed_title)
++                .setMessage(R.string.nobi_apt_update_failed_message)
++                .setPositiveButton(R.string.nobi_apt_update_retry, (dialog, which) -> ensureAsync(act))
++                .setNegativeButton(R.string.nobi_apt_update_later, null)
++                .show();
++        });
+     }
+ 
+     private static String readFile(File file) {
+--- a/termux-app/app/src/main/res/values/strings.xml
++++ b/termux-app/app/src/main/res/values/strings.xml
+@@ -277,4 +277,9 @@
+ 
+     <string name="nobi_settings_save_failed">Could not save the setting. Please try again.</string>
+ 
++    <string name="nobi_apt_update_failed_title">Apt update failed</string>
++    <string name="nobi_apt_update_failed_message">Nobi sources are set, but the package lists could not be downloaded. Check your connection and try again.</string>
++    <string name="nobi_apt_update_retry">Retry</string>
++    <string name="nobi_apt_update_later">Later</string>
++
+ </resources>
