@@ -1,0 +1,562 @@
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -96,7 +96,7 @@
+ 
+             <LinearLayout
+                 android:id="@+id/left_drawer"
+-                android:layout_width="280dp"
++                android:layout_width="@dimen/nobi_ds_drawer_width"
+                 android:layout_height="match_parent"
+                 android:layout_gravity="start"
+                 android:choiceMode="singleChoice"
+@@ -104,21 +104,59 @@
+                 android:dividerHeight="0dp"
+                 android:descendantFocusability="blocksDescendants"
+                 android:orientation="vertical"
+-                android:background="?attr/termuxActivityDrawerBackground">
++                android:background="@drawable/nobi_drawer_background">
+ 
++                <!-- v24 w49: compact M3 drawer header (spec 3): icon +
++                     app name + "Developer workspace" + real version.
++                     Replaces the v5 settings-gear row (gone since v5,
++                     still wired — the wiring is removed in code).
++                     Icon is ic_foreground (transparent N mark), NOT
++                     nobi_app_icon (that vector has a baked bg rect). -->
+                 <LinearLayout
+                     android:layout_width="match_parent"
+                     android:layout_height="wrap_content"
+-                    android:orientation="horizontal">
+-                    <ImageButton
+-                        android:id="@+id/settings_button"
++                    android:orientation="horizontal"
++                    android:gravity="center_vertical"
++                    android:paddingStart="16dp"
++                    android:paddingTop="16dp"
++                    android:paddingEnd="16dp"
++                    android:paddingBottom="12dp">
++
++                    <ImageView
+                         android:layout_width="40dp"
+                         android:layout_height="40dp"
+-                        android:visibility="gone"
+-                        android:src="@drawable/ic_settings"
+-                        android:background="@null"
+-                        android:contentDescription="@string/action_open_settings"
+-                        app:tint="?attr/termuxActivityDrawerImageTint" />
++                        android:contentDescription="@null"
++                        android:src="@drawable/ic_foreground" />
++
++                    <LinearLayout
++                        android:layout_width="0dp"
++                        android:layout_height="wrap_content"
++                        android:layout_weight="1"
++                        android:layout_marginStart="12dp"
++                        android:orientation="vertical">
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:text="@string/application_name"
++                            android:textColor="@color/nobi_ds_drawer_text"
++                            android:textSize="16sp"
++                            android:textStyle="bold" />
++
++                        <TextView
++                            android:layout_width="wrap_content"
++                            android:layout_height="wrap_content"
++                            android:text="@string/nobi_drawer_subtitle"
++                            android:textColor="@color/nobi_ds_drawer_text_secondary"
++                            android:textSize="12sp" />
++                    </LinearLayout>
++
++                    <TextView
++                        android:id="@+id/nobi_drawer_version"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:textColor="@color/nobi_ds_drawer_text_secondary"
++                        android:textSize="11sp" />
+                 </LinearLayout>
+ 
+                 <LinearLayout
+@@ -127,104 +165,84 @@
+                     android:layout_height="0dp"
+                     android:layout_weight="1"
+                     android:orientation="vertical"
+-                    android:paddingTop="8dp">
++                    android:paddingTop="0dp">
+ 
+                     <LinearLayout
+-                        android:id="@+id/nobi_menu_new_window"
+-                        android:background="?attr/selectableItemBackground"
++                        android:id="@+id/nobi_menu_new_session"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+-                            android:src="@drawable/ic_new_window"
++                            android:src="@drawable/ic_new_session"
+                             app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
+-                            android:text="@string/nobi_menu_new_window"
++                            android:layout_marginStart="16dp"
++                            android:text="@string/nobi_menu_new_session"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+                     </LinearLayout>
+-
+                     <LinearLayout
+-                        android:id="@+id/nobi_menu_nobicode"
+-                        android:background="?attr/selectableItemBackground"
++                        android:id="@+id/nobi_menu_new_window"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+-                            android:src="@drawable/ic_nobi_code"
++                            android:src="@drawable/ic_new_window"
+                             app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
+-                            android:text="@string/nobi_menu_nobicode"
++                            android:layout_marginStart="16dp"
++                            android:text="@string/nobi_menu_new_window"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+                     </LinearLayout>
+ 
+                     <LinearLayout
+-                        android:id="@+id/nobi_menu_new_session"
+-                        android:background="?attr/selectableItemBackground"
++                        android:id="@+id/nobi_menu_nobicode"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+                             android:layout_height="24dp"
+                             android:contentDescription="@null"
+-                            android:src="@drawable/ic_new_session"
++                            android:src="@drawable/ic_nobi_code"
+                             app:tint="@color/nobi_cyan" />
+ 
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
+-                            android:text="@string/nobi_menu_new_session"
++                            android:layout_marginStart="16dp"
++                            android:text="@string/nobi_menu_nobicode"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+                     </LinearLayout>
+ 
++
+                     <!-- v6 batch 1-16: terminal tools. -->
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_quick_commands"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -236,7 +254,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_quick_commands"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -244,15 +262,10 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_find"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -264,7 +277,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_find"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -272,15 +285,10 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_server"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -292,7 +300,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_server"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -300,15 +308,10 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_session_tools"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -320,7 +323,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_session_tools"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -329,15 +332,10 @@
+                     <!-- v7 (58): terminal output → editor. -->
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_output_editor"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -349,7 +347,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_output_editor"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -357,15 +355,10 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_permissions"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -377,7 +370,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_permissions"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -385,15 +378,10 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_settings"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -405,7 +393,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_settings"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+@@ -413,15 +401,10 @@
+ 
+                     <LinearLayout
+                         android:id="@+id/nobi_menu_exit"
+-                        android:background="?attr/selectableItemBackground"
++                        style="@style/NobiDs.DrawerRow"
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+-                        android:gravity="center_vertical"
+-                        android:orientation="horizontal"
+-                        android:paddingStart="20dp"
+-                        android:paddingTop="13dp"
+-                        android:paddingEnd="16dp"
+-                        android:paddingBottom="13dp">
++                        android:orientation="horizontal">
+ 
+                         <ImageView
+                             android:layout_width="24dp"
+@@ -433,7 +416,7 @@
+                         <TextView
+                             android:layout_width="wrap_content"
+                             android:layout_height="wrap_content"
+-                            android:layout_marginStart="14dp"
++                            android:layout_marginStart="16dp"
+                             android:text="@string/nobi_menu_exit"
+                             android:textColor="?attr/termuxActivityDrawerImageTint"
+                             android:textSize="15sp" />
+diff --git a/termux-app/app/src/main/res/values/nobi_drawer_strings.xml b/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
+--- a/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
++++ b/termux-app/app/src/main/res/values/nobi_drawer_strings.xml
+@@ -6,6 +6,8 @@
+     <string name="nobi_menu_permissions">Permissions</string>
+     <string name="nobi_menu_settings">Settings</string>
+     <string name="nobi_menu_exit">Exit</string>
++    <!-- v24 w49: drawer header subtitle (spec 3). -->
++    <string name="nobi_drawer_subtitle">Developer workspace</string>
+     <!-- v6 batch 1-16 drawer rows. -->
+     <string name="nobi_menu_quick_commands">Quick Commands</string>
+     <string name="nobi_menu_find">Find in Terminal</string>
+diff --git a/termux-app/app/src/main/res/values/nobi_ds_styles.xml b/termux-app/app/src/main/res/values/nobi_ds_styles.xml
+--- a/termux-app/app/src/main/res/values/nobi_ds_styles.xml
++++ b/termux-app/app/src/main/res/values/nobi_ds_styles.xml
+@@ -19,7 +19,7 @@
+         <item name="android:paddingStart">@dimen/nobi_ds_spacing_16</item>
+         <item name="android:paddingEnd">@dimen/nobi_ds_spacing_16</item>
+         <item name="android:paddingTop">@dimen/nobi_ds_spacing_16</item>
+-        <item name="android:paddingBottom">6dp</item>
++        <item name="android:paddingBottom">@dimen/nobi_ds_spacing_8</item>
+     </style>
+     <style name="NobiDs.ToolbarTitle">
+         <item name="android:textSize">20sp</item>
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -297,8 +297,6 @@
+ 
+         setTerminalToolbarView(savedInstanceState);
+ 
+-        setSettingsButtonView();
+-
+         setNewSessionButtonView();
+ 
+         setToggleKeyboardView();
+@@ -1810,6 +1808,25 @@
+         updateNobiToolbarSubtitle();
+     }
+ 
++    // ---- v24 w49: drawer header version + M3 scrim (spec 3). The
++    // version is read from the real package info at runtime, never
++    // hardcoded. The scrim is the M3 32% black, set explicitly (the
++    // DrawerLayout default is 60% and was never set before). The black
++    // strip root fix is: full-bleed DrawerLayout (w48 removed the 3dp
++    // container margins) + 304dp drawer + explicit scrim + rounded
++    // trailing corners — no overlay hack, no hardcoded screen width.
++    private void setupNobiDrawerHeader() {
++        android.widget.TextView versionView = findViewById(R.id.nobi_drawer_version);
++        if (versionView != null) {
++            try {
++                String version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
++                versionView.setText(version != null ? "v" + version : "");
++            } catch (Exception ignored) {
++            }
++        }
++        if (getDrawer() != null) getDrawer().setScrimColor(0x52000000);
++    }
++
+     private void updateNobiToolbarSubtitle() {
+         com.google.android.material.appbar.MaterialToolbar toolbar =
+             findViewById(R.id.nobi_toolbar);
+@@ -1847,7 +1864,9 @@
+         for (String key : raw.split(",")) {
+             if (!key.isEmpty()) order.add(key);
+         }
+-        String[] defaults = new String[]{"new_window", "nobicode", "new_session",
++        // v24 w49: spec order — WORKSPACE (New Session first), TOOLS,
++        // APPLICATION. Saved user orders are preserved as-is.
++        String[] defaults = new String[]{"new_session", "new_window", "nobicode",
+             "quick_commands", "find", "server", "session_tools", "output_editor",
+             "permissions", "settings", "exit"};
+         for (String key : defaults) if (!order.contains(key)) order.add(key);
+@@ -1885,6 +1904,9 @@
+         }
+         for (View leftover : byKey.values()) menu.addView(leftover);
+ 
++        // v24 w49: M3 section labels (spec 3) — see insertNobiDrawerSectionLabels.
++        insertNobiDrawerSectionLabels(menu);
++
+         // v9 (drawer footer): upstream Termux added a drawer footer bar
+         // (drawer_buttons) holding KEYBOARD / NEW SESSION / NEW WINDOW
+         // buttons, and setNewWindowButtonView() forces that bar VERTICAL
+@@ -1900,6 +1922,41 @@
+         if (drawerButtons != null) drawerButtons.setVisibility(View.GONE);
+     }
+ 
++    // v24 w49: M3 section labels (spec 3). Labels are created here, not
++    // in XML: applyNobiDrawerCustomization() does removeAllViews() and
++    // only re-adds String-tagged rows, so XML labels would be dropped.
++    // A label shows only when at least one row of its group is visible;
++    // it carries a non-String (Integer) tag so the byKey map and the
++    // density pass ignore it, and it is re-created on every pass.
++    private void insertNobiDrawerSectionLabels(android.widget.LinearLayout menu) {
++        String[][] groups = {
++            {"WORKSPACE", "new_session", "new_window", "nobicode"},
++            {"TOOLS", "quick_commands", "find", "server", "session_tools", "output_editor"},
++            {"APPLICATION", "permissions", "settings", "exit"}
++        };
++        for (String[] group : groups) {
++            int firstVisible = -1;
++            for (int i = 1; i < group.length && firstVisible < 0; i++) {
++                for (int j = 0; j < menu.getChildCount(); j++) {
++                    View row = menu.getChildAt(j);
++                    if (group[i].equals(row.getTag()) && row.getVisibility() == View.VISIBLE) {
++                        firstVisible = j;
++                        break;
++                    }
++                }
++            }
++            if (firstVisible < 0) continue;
++            android.widget.TextView label = new android.widget.TextView(this);
++            label.setText(group[0]);
++            label.setTextAppearance(this, R.style.NobiDs_DrawerSectionLabel);
++            int p16 = getResources().getDimensionPixelSize(R.dimen.nobi_ds_spacing_16);
++            int p8 = getResources().getDimensionPixelSize(R.dimen.nobi_ds_spacing_8);
++            label.setPadding(p16, p16, p16, p8);
++            label.setTag(Integer.valueOf(0x4E4F4249)); // "NOBI" marker
++            menu.addView(label, firstVisible);
++        }
++    }
++
+     private android.graphics.drawable.Drawable mNobiDrawerOriginalBg = null;
+ 
+     private void applyNobiDrawerDensityAndGlass() {
+@@ -1909,6 +1966,7 @@
+         int vertical = (int) ((compact ? 8 : 13) * getResources().getDisplayMetrics().density);
+         for (int i = 0; i < menu.getChildCount(); i++) {
+             View row = menu.getChildAt(i);
++            if (row.getTag() instanceof Integer) continue; // v24 w49: section label, not a row
+             row.setPadding(row.getPaddingLeft(), vertical, row.getPaddingRight(), vertical);
+         }
+         View drawer = findViewById(R.id.left_drawer);
+@@ -2017,6 +2075,8 @@
+     private void setupNobiV7Chrome(Bundle savedInstanceState) {
+         // v24 w48: TopAppBar setup (nav icon + session subtitle).
+         setupNobiToolbar();
++        // v24 w49: drawer header version + M3 scrim.
++        setupNobiDrawerHeader();
+         // Bottom bar (81): tabs cycle, editor, settings in one tap.
+         View bottomBar = findViewById(R.id.nobi_bottom_bar);
+         if (bottomBar != null) {
+@@ -2774,13 +2834,6 @@
+ 
+ 
+ 
+-    private void setSettingsButtonView() {
+-        ImageButton settingsButton = findViewById(R.id.settings_button);
+-        settingsButton.setOnClickListener(v -> {
+-            ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class));
+-        });
+-    }
+-
+     private void setNewSessionButtonView() {
+         View newSessionButton = findViewById(R.id.new_session_button);
+         newSessionButton.setOnClickListener(v -> mTermuxTerminalSessionActivityClient.addNewSession(false, null));

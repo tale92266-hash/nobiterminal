@@ -1,0 +1,206 @@
+diff --git a/termux-app/app/src/main/res/values/colors.xml b/termux-app/app/src/main/res/values/colors.xml
+--- a/termux-app/app/src/main/res/values/colors.xml
++++ b/termux-app/app/src/main/res/values/colors.xml
+@@ -5,8 +5,11 @@
+     <color name="nobi_splash_background">#070B1F</color>
+     <!-- v9: drawer + keys-bar navy, same as the tabs bar (#FF0A0F24). -->
+     <color name="nobi_navy">#FF0A0F24</color>
+-    <!-- v20: Nobi cyan (matches notification + splash name) + lighter-navy pressed surface for extra keys. -->
+-    <color name="nobi_cyan">#FF22D3EE</color>
++    <!-- v20: Nobi cyan + lighter-navy pressed surface for extra keys.
++         v24 w47: unified on the spec accent #25C2D8 (was #22D3EE; the
++         terminal cursor default 0xff22d3ee in TerminalColorScheme is a
++         separate hardcoded constant and is untouched). -->
++    <color name="nobi_cyan">#FF25C2D8</color>
+     <color name="nobi_key_pressed">#FF1E2C55</color>
+     <!-- v21 w30/w31: periwinkle secondary text for dark surfaces (never grey). -->
+     <color name="nobi_periwinkle">#FF9AA5D9</color>
+@@ -14,7 +17,29 @@
+     <color name="nobi_body_surface">#FFF4F6FC</color>
+     <color name="nobi_secondary_text">@color/nobi_navy</color>
+     <!-- v21 w38: 40% cyan selection highlight for the terminal text-input bar. -->
+-    <color name="nobi_cyan_highlight">#6622D3EE</color>
++    <color name="nobi_cyan_highlight">#6625C2D8</color>
+     <!-- v21 w39: scrollbar thumb tint, >=3:1 on black (5.49:1) and white (3.83:1). -->
+     <color name="nobi_scroll_thumb">#FF6B7FC7</color>
++    <!-- v24 w47: design-system tokens, LIGHT mode values (night twins in
++         values-night/colors.xml). The dark palette is the spec palette
++         (#0B0F19 app bg, #080D1C terminal bg, #111827 surface, #182233
++         elevated, #1B3543 selected, #25C2D8 accent, #E5EDF6/#A5B4C7/
++         #65748A text, #263449 outline); light values are the matching
++         coherent light theme. Drawer stays navy in BOTH modes (v21 w36). -->
++    <color name="nobi_ds_app_bg">#FFF4F6FC</color>
++    <color name="nobi_ds_terminal_bg">#FFF8FAFC</color>
++    <color name="nobi_ds_surface">#FFFFFFFF</color>
++    <color name="nobi_ds_elevated">#FFF1F5F9</color>
++    <color name="nobi_ds_selected">#FFE0F2FE</color>
++    <color name="nobi_ds_accent">@color/nobi_cyan</color>
++    <color name="nobi_ds_text_primary">#FF0F172A</color>
++    <color name="nobi_ds_text_secondary">#FF475569</color>
++    <color name="nobi_ds_text_tertiary">#FF94A3B8</color>
++    <color name="nobi_ds_outline">#FFE2E8F0</color>
++    <color name="nobi_ds_success">#FF166534</color>
++    <color name="nobi_ds_warning">#FF92400E</color>
++    <color name="nobi_ds_error">#FFB91C1C</color>
++    <color name="nobi_ds_drawer_bg">#FF0A0F24</color>
++    <color name="nobi_ds_drawer_text">#FFFFFFFF</color>
++    <color name="nobi_ds_drawer_text_secondary">#FF9AA5D9</color>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values-night/colors.xml b/termux-app/app/src/main/res/values-night/colors.xml
+--- a/termux-app/app/src/main/res/values-night/colors.xml
++++ b/termux-app/app/src/main/res/values-night/colors.xml
+@@ -4,4 +4,21 @@
+          periwinkle secondary text). nobi_navy/nobi_cyan/nobi_periwinkle resolve from values/. -->
+     <color name="nobi_body_surface">#FF101730</color>
+     <color name="nobi_secondary_text">#FF9AA5D9</color>
++    <!-- v24 w47: design-system tokens, DARK mode values = the spec palette. -->
++    <color name="nobi_ds_app_bg">#FF0B0F19</color>
++    <color name="nobi_ds_terminal_bg">#FF080D1C</color>
++    <color name="nobi_ds_surface">#FF111827</color>
++    <color name="nobi_ds_elevated">#FF182233</color>
++    <color name="nobi_ds_selected">#FF1B3543</color>
++    <color name="nobi_ds_accent">@color/nobi_cyan</color>
++    <color name="nobi_ds_text_primary">#FFE5EDF6</color>
++    <color name="nobi_ds_text_secondary">#FFA5B4C7</color>
++    <color name="nobi_ds_text_tertiary">#FF65748A</color>
++    <color name="nobi_ds_outline">#FF263449</color>
++    <color name="nobi_ds_success">#FFA6D9B8</color>
++    <color name="nobi_ds_warning">#FFE9BC75</color>
++    <color name="nobi_ds_error">#FFF08C8C</color>
++    <color name="nobi_ds_drawer_bg">#FF0A0F24</color>
++    <color name="nobi_ds_drawer_text">#FFE5EDF6</color>
++    <color name="nobi_ds_drawer_text_secondary">#FF9AA5D9</color>
+ </resources>
+diff --git a/termux-app/app/src/main/res/values/dimens.xml b/termux-app/app/src/main/res/values/dimens.xml
+--- /dev/null
++++ b/termux-app/app/src/main/res/values/dimens.xml
+@@ -0,0 +1,37 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- v24 w47: design-system dimensions. 4dp spacing scale + component
++         metrics from the redesign spec. One source of truth: layouts and
++         code must use these instead of hardcoded dp values. -->
++    <dimen name="nobi_ds_spacing_4">4dp</dimen>
++    <dimen name="nobi_ds_spacing_8">8dp</dimen>
++    <dimen name="nobi_ds_spacing_12">12dp</dimen>
++    <dimen name="nobi_ds_spacing_16">16dp</dimen>
++    <dimen name="nobi_ds_spacing_20">20dp</dimen>
++    <dimen name="nobi_ds_spacing_24">24dp</dimen>
++    <dimen name="nobi_ds_corner_small">8dp</dimen>
++    <dimen name="nobi_ds_corner_medium">12dp</dimen>
++    <dimen name="nobi_ds_corner_large">16dp</dimen>
++    <dimen name="nobi_ds_corner_xl">20dp</dimen>
++    <dimen name="nobi_ds_corner_xxl">24dp</dimen>
++    <!-- TopAppBar (spec 2A). -->
++    <dimen name="nobi_ds_toolbar_height">56dp</dimen>
++    <!-- Session tabs bar (spec 2B). -->
++    <dimen name="nobi_ds_tabs_bar_height">40dp</dimen>
++    <dimen name="nobi_ds_tab_corner">12dp</dimen>
++    <!-- Navigation drawer (spec 3). -->
++    <dimen name="nobi_ds_drawer_width">304dp</dimen>
++    <dimen name="nobi_ds_drawer_item_height">54dp</dimen>
++    <dimen name="nobi_ds_drawer_icon_size">24dp</dimen>
++    <dimen name="nobi_ds_drawer_icon_text_gap">16dp</dimen>
++    <dimen name="nobi_ds_drawer_corner">24dp</dimen>
++    <!-- Extra keys (spec 4). -->
++    <dimen name="nobi_ds_extra_key_row_height">44dp</dimen>
++    <dimen name="nobi_ds_extra_key_gap">3dp</dimen>
++    <dimen name="nobi_ds_extra_key_corner">8dp</dimen>
++    <!-- Terminal workspace (spec 2C). -->
++    <dimen name="nobi_ds_terminal_padding">8dp</dimen>
++    <!-- Branding (spec 2D): ~50% smaller than the 132dp v7 marks. -->
++    <dimen name="nobi_ds_splash_mark_size">64dp</dimen>
++    <dimen name="nobi_ds_intro_icon_size">64dp</dimen>
++</resources>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_drawer_background.xml b/termux-app/app/src/main/res/drawable/nobi_drawer_background.xml
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/nobi_drawer_background.xml
+@@ -0,0 +1,12 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- v24 w47: drawer background — navy in both modes (w36) with 24dp
++     rounded TRAILING corners only (spec 3). The leading edge stays square
++     against the screen edge. Glass look swaps this drawable at runtime
++     (applyNobiDrawerDensityAndGlass caches it as the "original" bg). -->
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="rectangle">
++    <solid android:color="@color/nobi_ds_drawer_bg" />
++    <corners
++        android:topRightRadius="@dimen/nobi_ds_drawer_corner"
++        android:bottomRightRadius="@dimen/nobi_ds_drawer_corner" />
++</shape>
+diff --git a/termux-app/app/src/main/res/values/nobi_ds_styles.xml b/termux-app/app/src/main/res/values/nobi_ds_styles.xml
+--- /dev/null
++++ b/termux-app/app/src/main/res/values/nobi_ds_styles.xml
+@@ -0,0 +1,32 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- v24 w47: design-system styles (spec Phase 1). Applied by the
++         w48/w49 layout patches; kept separate from upstream styles.xml. -->
++    <style name="NobiDs.DrawerRow">
++        <item name="android:minHeight">@dimen/nobi_ds_drawer_item_height</item>
++        <item name="android:paddingTop">15dp</item>
++        <item name="android:paddingBottom">15dp</item>
++        <item name="android:paddingStart">@dimen/nobi_ds_spacing_16</item>
++        <item name="android:paddingEnd">@dimen/nobi_ds_spacing_16</item>
++        <item name="android:background">?attr/selectableItemBackground</item>
++        <item name="android:gravity">center_vertical</item>
++    </style>
++    <style name="NobiDs.DrawerSectionLabel">
++        <item name="android:textSize">12sp</item>
++        <item name="android:textStyle">bold</item>
++        <item name="android:textColor">@color/nobi_ds_drawer_text_secondary</item>
++        <item name="android:letterSpacing">0.08</item>
++        <item name="android:paddingStart">@dimen/nobi_ds_spacing_16</item>
++        <item name="android:paddingEnd">@dimen/nobi_ds_spacing_16</item>
++        <item name="android:paddingTop">@dimen/nobi_ds_spacing_16</item>
++        <item name="android:paddingBottom">6dp</item>
++    </style>
++    <style name="NobiDs.ToolbarTitle">
++        <item name="android:textSize">20sp</item>
++        <item name="android:textColor">@color/nobi_ds_text_primary</item>
++    </style>
++    <style name="NobiDs.ToolbarSubtitle">
++        <item name="android:textSize">12sp</item>
++        <item name="android:textColor">@color/nobi_ds_text_secondary</item>
++    </style>
++</resources>
+diff --git a/termux-app/app/src/main/res/values/themes.xml b/termux-app/app/src/main/res/values/themes.xml
+--- a/termux-app/app/src/main/res/values/themes.xml
++++ b/termux-app/app/src/main/res/values/themes.xml
+@@ -91,7 +91,10 @@
+         <item name="colorSecondary">@color/nobi_cyan</item>
+         <item name="colorControlActivated">@color/nobi_cyan</item>
+ 
+-        <item name="android:windowBackground">@color/black</item>
++        <!-- v24 w47: window bg = design-system terminal bg (#080D1C dark /
++             #F8FAFC light) instead of pure black; also the no-emulator
++             fallback paint in TerminalView (w48) uses the same colour. -->
++        <item name="android:windowBackground">@color/nobi_ds_terminal_bg</item>
+ 
+         <!-- Avoid action mode toolbar pushing down terminal content when
+              selecting text on pre-6.0 (non-floating toolbar). -->
+@@ -110,11 +113,19 @@
+         <item name="termuxActivityDrawerBackground">@color/nobi_navy</item>
+         <item name="termuxActivityDrawerImageTint">@color/white</item>
+ 
+-        <!-- Extra keys colors. -->
+-        <item name="extraKeysButtonTextColor">@color/white</item>
+-        <item name="extraKeysButtonActiveTextColor">@color/nobi_cyan</item>
+-        <item name="extraKeysButtonBackgroundColor">@color/nobi_navy</item>
+-        <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_key_pressed</item>
++        <!-- Extra keys colors (v24 w47: design-system tokens). Resting key
++             bg = elevated surface (#182233 dark / #F1F5F9 light), pressed/
++             active = selected surface (#1B3543 / #E0F2FE), text resolves
++             per-mode. nobi_key_pressed stays defined but unused here. -->
++        <item name="extraKeysButtonTextColor">@color/nobi_ds_text_primary</item>
++        <item name="extraKeysButtonActiveTextColor">@color/nobi_ds_accent</item>
++        <item name="extraKeysButtonBackgroundColor">@color/nobi_ds_elevated</item>
++        <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_ds_selected</item>
++
++        <!-- v24 w47: surface roles for dialogs/menus (mode-resolved). -->
++        <item name="colorSurface">@color/nobi_ds_surface</item>
++        <item name="colorOnSurface">@color/nobi_ds_text_primary</item>
++        <item name="colorError">@color/nobi_ds_error</item>
+     </style>
+ 
+     <!-- NobiTerminal launch theme: branded splash window background, replaced

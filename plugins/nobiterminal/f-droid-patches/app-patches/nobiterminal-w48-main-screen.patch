@@ -1,0 +1,488 @@
+diff --git a/termux-app/app/src/main/res/layout/activity_termux.xml b/termux-app/app/src/main/res/layout/activity_termux.xml
+--- a/termux-app/app/src/main/res/layout/activity_termux.xml
++++ b/termux-app/app/src/main/res/layout/activity_termux.xml
+@@ -7,12 +7,25 @@
+     android:orientation="vertical"
+     android:fitsSystemWindows="true">
+ 
++    <!-- v24 w48: Material 3-style TopAppBar (spec 2A). 56dp, nav icon opens
++         the drawer, title is the app name, subtitle is the current session
++         (set from code in updateNobiToolbarSubtitle). -->
++    <com.google.android.material.appbar.MaterialToolbar
++        android:id="@+id/nobi_toolbar"
++        android:layout_width="match_parent"
++        android:layout_height="@dimen/nobi_ds_toolbar_height"
++        android:background="@color/nobi_ds_app_bg"
++        app:navigationIcon="@drawable/ic_nobi_menu"
++        app:title="@string/application_name"
++        app:titleTextColor="@color/nobi_ds_text_primary"
++        app:subtitleTextColor="@color/nobi_ds_text_secondary" />
++
+     <LinearLayout
+         android:id="@+id/nobi_tabs_bar"
+         android:layout_width="match_parent"
+-        android:layout_height="40dp"
++        android:layout_height="@dimen/nobi_ds_tabs_bar_height"
+         android:orientation="horizontal"
+-        android:background="#FF0A0F24">
++        android:background="@color/nobi_ds_surface">
+ 
+         <HorizontalScrollView
+             android:id="@+id/nobi_tabs_scroll_view"
+@@ -35,7 +48,7 @@
+             android:gravity="center"
+             android:text="+"
+             android:textSize="22sp"
+-            android:textColor="#FF22D3EE"
++            android:textColor="@color/nobi_ds_accent"
+             android:contentDescription="New session" />
+     </LinearLayout>
+ 
+@@ -49,8 +62,8 @@
+         android:paddingEnd="12dp"
+         android:paddingTop="2dp"
+         android:paddingBottom="4dp"
+-        android:background="#FF0A0F24"
+-        android:textColor="#FF9AA5D9"
++        android:background="@color/nobi_ds_surface"
++        android:textColor="@color/nobi_ds_text_secondary"
+         android:textSize="12sp"
+         android:maxLines="1"
+         android:ellipsize="end" />
+@@ -60,7 +73,6 @@
+         android:layout_width="match_parent"
+         android:layout_height="0dp"
+         android:layout_weight="1"
+-        android:layout_marginHorizontal="3dp"
+         android:layout_marginVertical="0dp"
+         android:orientation="vertical">
+ 
+@@ -75,6 +87,7 @@
+                 android:id="@+id/terminal_view"
+                 android:layout_width="match_parent"
+                 android:layout_height="match_parent"
++                android:layout_marginHorizontal="@dimen/nobi_ds_terminal_padding"
+                 android:defaultFocusHighlightEnabled="false"
+                 android:focusableInTouchMode="true"
+                 android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
+@@ -481,20 +494,6 @@
+             android:background="?attr/termuxActivityDrawerBackground"
+             android:layout_alignParentBottom="true" />
+ 
+-        <!-- v7 (83): floating quick-actions button, above the extra keys. -->
+-        <ImageButton
+-            android:id="@+id/nobi_fab"
+-            android:layout_width="56dp"
+-            android:layout_height="56dp"
+-            android:layout_above="@id/terminal_toolbar_view_pager"
+-            android:layout_alignParentEnd="true"
+-            android:layout_marginEnd="16dp"
+-            android:layout_marginBottom="12dp"
+-            android:background="@drawable/nobi_fab_background"
+-            android:contentDescription="Quick actions"
+-            android:src="@drawable/ic_nobi_plus"
+-            android:visibility="visible" />
+-
+     </RelativeLayout>
+ 
+     <!-- v7 (81): optional bottom navigation bar (drawer alternative). -->
+@@ -502,7 +501,7 @@
+         android:id="@+id/nobi_bottom_bar"
+         android:layout_width="match_parent"
+         android:layout_height="48dp"
+-        android:background="#FF0A0F24"
++        android:background="@color/nobi_ds_surface"
+         android:orientation="horizontal"
+         android:visibility="gone">
+ 
+diff --git a/termux-app/app/src/main/res/drawable/ic_nobi_menu.xml b/termux-app/app/src/main/res/drawable/ic_nobi_menu.xml
+--- /dev/null
++++ b/termux-app/app/src/main/res/drawable/ic_nobi_menu.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- v24 w48: hamburger nav icon, Material Symbols Rounded style
++     (3 rounded bars). Tinted with the design-system primary text
++     colour so it follows day/night. -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24"
++    android:tint="@color/nobi_ds_text_primary">
++    <path
++        android:strokeColor="@android:color/white"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:pathData="M4,7h16 M4,12h16 M4,17h16" />
++</vector>
+diff --git a/termux-app/app/src/main/res/drawable/nobi_splash_background.xml b/termux-app/app/src/main/res/drawable/nobi_splash_background.xml
+--- a/termux-app/app/src/main/res/drawable/nobi_splash_background.xml
++++ b/termux-app/app/src/main/res/drawable/nobi_splash_background.xml
+@@ -4,8 +4,8 @@
+ <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+     <item android:drawable="@color/nobi_splash_background" />
+     <item
+-        android:width="132dp"
+-        android:height="132dp"
++        android:width="@dimen/nobi_ds_splash_mark_size"
++        android:height="@dimen/nobi_ds_splash_mark_size"
+         android:gravity="center"
+         android:drawable="@drawable/ic_foreground" />
+ </layer-list>
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -595,6 +595,8 @@
+         // onServiceConnected hunk still applies cleanly on top.
+         deliverPendingTerminalInput();
+         // v7: editor→terminal extras, startup picker, time-aware theme.
++        // v24 w48: compact the oversized motd art once (guarded, bg thread).
++        com.termux.app.nobi.NobiWelcome.compactMotdIfNeeded(TermuxActivity.this);
+         deliverNobiExtras();
+         showNobiStartupPickerIfNeeded();
+         applyNobiTimeAwareTheme();
+@@ -821,11 +823,11 @@
+ 
+     /** v7 accent colour (hex), default neon cyan. */
+     int nobiAccentColor() {
+-        String hex = nobiV7Prefs().getString("accent", "#22D3EE");
++        String hex = nobiV7Prefs().getString("accent", "#25C2D8");
+         try {
+             return android.graphics.Color.parseColor(hex);
+         } catch (Exception e) {
+-            return android.graphics.Color.parseColor("#22D3EE");
++            return android.graphics.Color.parseColor("#25C2D8");
+         }
+     }
+ 
+@@ -1694,7 +1696,7 @@
+     private void showNobiAccentDialog() {
+         // w19: dialog khulte hi keyboard neeche karo, is dialog me typing nahi hai.
+         com.termux.shared.view.KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+-        final String[] hexes = new String[]{"#22D3EE", "#8B5CF6", "#34D399", "#FBBF24",
++        final String[] hexes = new String[]{"#25C2D8", "#8B5CF6", "#34D399", "#FBBF24",
+             "#F87171", "#F472B6", "#60A5FA"};
+         final String[] labels = new String[]{
+             getString(R.string.nobi_accent_cyan), getString(R.string.nobi_accent_violet),
+@@ -1702,7 +1704,7 @@
+             getString(R.string.nobi_accent_red), getString(R.string.nobi_accent_pink),
+             getString(R.string.nobi_accent_blue)};
+         int checked = 0;
+-        String current = nobiV7Prefs().getString("accent", "#22D3EE");
++        String current = nobiV7Prefs().getString("accent", "#25C2D8");
+         for (int i = 0; i < hexes.length; i++) if (hexes[i].equalsIgnoreCase(current)) checked = i;
+         new AlertDialog.Builder(this)
+             .setTitle(R.string.nobi_tool_accent)
+@@ -1792,23 +1794,30 @@
+         }
+     }
+ 
+-    private void applyNobiFabVisibility() {
+-        View fab = findViewById(R.id.nobi_fab);
+-        if (fab != null) {
+-            fab.setVisibility(nobiV7Prefs().getBoolean("fab", true) ? View.VISIBLE : View.GONE);
+-        }
++    // ---- v24 w48: Material 3-style TopAppBar (spec 2A). App chrome
++    // only: nav icon opens the drawer, title is the app name, subtitle
++    // is the current session's tab label (updated by refreshNobiTabs).
++    // No menu actions: new session stays on the tabs-bar "+" — the FAB
++    // was removed as a duplicate (its 4 actions all live in the drawer).
++    private void setupNobiToolbar() {
++        com.google.android.material.appbar.MaterialToolbar toolbar =
++            findViewById(R.id.nobi_toolbar);
++        if (toolbar == null) return;
++        toolbar.setNavigationOnClickListener(v -> {
++            if (getDrawer() != null)
++                getDrawer().openDrawer(android.view.Gravity.LEFT);
++        });
++        updateNobiToolbarSubtitle();
+     }
+ 
+-    private void applyNobiFabTint() {
+-        View fab = findViewById(R.id.nobi_fab);
+-        if (fab == null) return;
+-        android.graphics.drawable.Drawable bg = fab.getBackground();
+-        if (bg != null) {
+-            bg = bg.mutate();
+-            if (bg instanceof android.graphics.drawable.GradientDrawable) {
+-                ((android.graphics.drawable.GradientDrawable) bg).setColor(nobiAccentColor());
+-            }
+-        }
++    private void updateNobiToolbarSubtitle() {
++        com.google.android.material.appbar.MaterialToolbar toolbar =
++            findViewById(R.id.nobi_toolbar);
++        if (toolbar == null) return;
++        String subtitle = null;
++        if (mNobiTabsController != null && getCurrentSession() != null)
++            subtitle = mNobiTabsController.getTabLabel(getCurrentSession());
++        toolbar.setSubtitle(subtitle);
+     }
+ 
+     // ---- v7 (88): drawer customization ----
+@@ -2006,6 +2015,8 @@
+     // ---- v7 (70/81/82/83): terminal chrome setup ----
+ 
+     private void setupNobiV7Chrome(Bundle savedInstanceState) {
++        // v24 w48: TopAppBar setup (nav icon + session subtitle).
++        setupNobiToolbar();
+         // Bottom bar (81): tabs cycle, editor, settings in one tap.
+         View bottomBar = findViewById(R.id.nobi_bottom_bar);
+         if (bottomBar != null) {
+@@ -2022,36 +2033,6 @@
+             applyNobiBottomBarVisibility();
+             applyNobiBottomBarTint();
+         }
+-        // FAB (83): quick actions popup.
+-        View fab = findViewById(R.id.nobi_fab);
+-        if (fab != null) {
+-            fab.setOnClickListener(v -> {
+-                android.widget.PopupMenu menu = new android.widget.PopupMenu(this, fab);
+-                menu.getMenu().add(getString(R.string.nobi_palette_new_session));
+-                menu.getMenu().add(getString(R.string.nobi_palette_new_window));
+-                menu.getMenu().add(getString(R.string.nobi_palette_editor));
+-                menu.getMenu().add(getString(R.string.nobi_menu_settings));
+-                menu.setOnMenuItemClickListener(item -> {
+-                    String title = item.getTitle().toString();
+-                    if (title.equals(getString(R.string.nobi_palette_new_session))) {
+-                        mTermuxTerminalSessionActivityClient.addNewSession(false, null);
+-                    } else if (title.equals(getString(R.string.nobi_palette_new_window))) {
+-                        View row = findViewById(R.id.nobi_menu_new_window);
+-                        if (row != null) row.performClick();
+-                    } else if (title.equals(getString(R.string.nobi_palette_editor))) {
+-                        ActivityUtils.startActivity(this,
+-                            new Intent(this, com.nobidev.nobicode.MainActivity.class));
+-                    } else {
+-                        ActivityUtils.startActivity(this,
+-                            new Intent(this, SettingsActivity.class));
+-                    }
+-                    return true;
+-                });
+-                menu.show();
+-            });
+-            applyNobiFabVisibility();
+-            applyNobiFabTint();
+-        }
+         // Gestures (82) on the tabs bar: fling left/right switches sessions,
+         // fling down opens the drawer, double-tap on EMPTY bar space opens
+         // the editor (double-tap on a tab itself stays tab rename).
+@@ -2119,10 +2100,10 @@
+             overlay.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+-            overlay.setBackgroundColor(0xFF0A0F24);
++            overlay.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.nobi_ds_app_bg));
+             overlay.setClickable(false);
+             overlay.setFocusable(false);
+-            int iconSize = (int) (132 * getResources().getDisplayMetrics().density);
++            int iconSize = getResources().getDimensionPixelSize(R.dimen.nobi_ds_intro_icon_size);
+             android.widget.ImageView icon = new android.widget.ImageView(this);
+             icon.setImageResource(R.drawable.nobi_app_icon);
+             android.widget.FrameLayout.LayoutParams iconParams =
+@@ -2131,8 +2112,8 @@
+             overlay.addView(icon, iconParams);
+             android.widget.TextView name = new android.widget.TextView(this);
+             name.setText("NOBITA");
+-            name.setTextColor(0xFF22D3EE);
+-            name.setTextSize(22);
++            name.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.nobi_ds_accent));
++            name.setTextSize(16);
+             name.setTypeface(null, android.graphics.Typeface.BOLD);
+             name.setLetterSpacing(0.3f);
+             android.widget.FrameLayout.LayoutParams nameParams =
+@@ -2478,7 +2459,7 @@
+                     getString(R.string.nobi_colour_blue),
+                     getString(R.string.nobi_colour_grey)};
+                 final Integer[] values = new Integer[]{
+-                    null, 0xFF22D3EE, 0xFF8B5CF6, 0xFF34D399, 0xFFFBBF24,
++                    null, 0xFF25C2D8, 0xFF8B5CF6, 0xFF34D399, 0xFFFBBF24,
+                     0xFFFB7185, 0xFFF472B6, 0xFF60A5FA, 0xFF9AA5D9};
+                 Integer current = NobiTabsController.loadTabColors(this).get(session.mHandle);
+                 int checked = 0;
+@@ -3112,6 +3093,7 @@
+     public void refreshNobiTabs() {
+         if (mNobiTabsController != null)
+             mNobiTabsController.refreshTabs();
++        updateNobiToolbarSubtitle();
+     }
+ 
+     public boolean isVisible() {
+diff --git a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+--- a/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
++++ b/termux-app/app/src/main/java/com/termux/app/terminal/NobiTabsController.java
+@@ -14,6 +14,7 @@
+ import android.widget.LinearLayout;
+ import android.widget.TextView;
+ 
++import androidx.core.content.ContextCompat;
+ import com.termux.R;
+ import com.termux.app.TermuxActivity;
+ import com.termux.app.TermuxService;
+@@ -47,11 +48,10 @@
+     private static final String PREF_KEY_NOTES = "tab_notes";
+     private static final String PREF_KEY_COLORS = "tab_colors";
+ 
+-    private static final int COLOR_TAB_ACTIVE_BG = 0xFF1B2452;
+-    private static final int COLOR_TAB_INACTIVE_BG = 0xFF101736;
+-    private static final int COLOR_TAB_ACTIVE_TEXT = 0xFF22D3EE;
+-    private static final int COLOR_TAB_INACTIVE_TEXT = 0xFF9AA5D9;
+-    private static final int COLOR_TAB_FAILED_TEXT = 0xFFFB7185;
++    // v24 w48: tab colours resolve from the design-system tokens at
++    // runtime (mode-resolved), so the strip follows day/night. Inactive
++    // tabs are transparent — the bar surface shows through. Per-tab
++    // colour dots and the user accent preference are untouched.
+ 
+     private final TermuxActivity mActivity;
+     private final HorizontalScrollView mTabsScrollView;
+@@ -262,14 +262,19 @@
+         }
+     }
+ 
+-    private static int parseNobiAccent(String hex) {
++    private int parseNobiAccent(String hex) {
+         try {
+             return android.graphics.Color.parseColor(hex);
+         } catch (Exception e) {
+-            return COLOR_TAB_ACTIVE_TEXT;
++            return dsColor(R.color.nobi_ds_accent);
+         }
+     }
+ 
++    /** Resolve a mode-aware design-system colour. */
++    private int dsColor(int resId) {
++        return ContextCompat.getColor(mActivity, resId);
++    }
++
+     private View createTabView(final TerminalSession session, int displayIndex, boolean isActive) {
+         LinearLayout tab = new LinearLayout(mActivity);
+         tab.setOrientation(LinearLayout.HORIZONTAL);
+@@ -278,17 +283,20 @@
+         SharedPreferences v7Prefs = mActivity.getSharedPreferences("nobi_v7", Context.MODE_PRIVATE);
+         String tabStyle = v7Prefs.getString("tab_style", "rounded");
+         boolean compact = "compact".equals(v7Prefs.getString("density", "comfortable"));
+-        int accent = parseNobiAccent(v7Prefs.getString("accent", "#22D3EE"));
+-        int activeText = isActive ? accent : COLOR_TAB_INACTIVE_TEXT;
++        int accent = parseNobiAccent(v7Prefs.getString("accent", "#25C2D8"));
++        int activeText = isActive ? accent : dsColor(R.color.nobi_ds_text_secondary);
++        int activeBg = dsColor(R.color.nobi_ds_selected);
++        int inactiveBg = android.graphics.Color.TRANSPARENT;
++        int failedText = dsColor(R.color.nobi_ds_error);
+         int verticalPad = dp(compact ? 2 : 4);
+         if ("rounded".equals(tabStyle)) {
+             android.graphics.drawable.GradientDrawable bg =
+                 new android.graphics.drawable.GradientDrawable();
+-            bg.setCornerRadius(dp(14));
+-            bg.setColor(isActive ? COLOR_TAB_ACTIVE_BG : COLOR_TAB_INACTIVE_BG);
++            bg.setCornerRadius(dp(12));
++            bg.setColor(isActive ? activeBg : inactiveBg);
+             tab.setBackground(bg);
+         } else {
+-            tab.setBackgroundColor(isActive ? COLOR_TAB_ACTIVE_BG : COLOR_TAB_INACTIVE_BG);
++            tab.setBackgroundColor(isActive ? activeBg : inactiveBg);
+         }
+         // v8 sizing: wider tabs (width only — height/verticalPad untouched)
+         // so short tabs stop crowding each other and mis-taps drop.
+@@ -328,7 +336,7 @@
+         if (!session.isRunning()) {
+             titleView.setPaintFlags(titleView.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+             if (session.getExitStatus() != 0)
+-                titleView.setTextColor(COLOR_TAB_FAILED_TEXT);
++                titleView.setTextColor(failedText);
+         }
+         tab.addView(titleView);
+ 
+diff --git a/termux-app/app/src/main/java/com/termux/app/nobi/NobiWelcome.java b/termux-app/app/src/main/java/com/termux/app/nobi/NobiWelcome.java
+--- /dev/null
++++ b/termux-app/app/src/main/java/com/termux/app/nobi/NobiWelcome.java
+@@ -0,0 +1,77 @@
++package com.termux.app.nobi;
++
++import android.content.Context;
++
++import com.termux.shared.termux.TermuxConstants;
++
++import java.io.File;
++import java.io.FileInputStream;
++import java.io.FileOutputStream;
++import java.nio.charset.StandardCharsets;
++
++/**
++ * v24 w48: one-time compaction of the oversized NOBITA block-letter motd
++ * (spec 2D). The motd lives in the bootstrap tarball, so a bootstrap patch
++ * would only reach fresh installs AND rotate PATCH_HASH (cache MISS); the
++ * app-start rewrite reaches existing installs too. Guarded: only rewrites
++ * when the file contains the known 5-line block art (a line with "█") plus
++ * the "Welcome back, Nobita." line; the two greeting lines are preserved
++ * byte-for-byte and everything else is left alone. Runs on a background
++ * thread; never throws (startup must never depend on it).
++ */
++public final class NobiWelcome {
++
++    private NobiWelcome() {
++    }
++
++    public static void compactMotdIfNeeded(Context context) {
++        try {
++            new Thread(() -> {
++                try {
++                    compactMotd();
++                } catch (Exception ignored) {
++                }
++            }).start();
++        } catch (Exception ignored) {
++        }
++    }
++
++    private static void compactMotd() throws Exception {
++        File motd = new File(TermuxConstants.TERMUX_PREFIX_DIR_PATH, "etc/motd");
++        if (!motd.isFile() || !motd.canRead() || !motd.canWrite()) return;
++        byte[] bytes = readAll(motd);
++        String text = new String(bytes, StandardCharsets.UTF_8);
++        if (!text.contains("█") || !text.contains("Welcome back, Nobita.")) return;
++        String welcome = null;
++        String rules = null;
++        for (String line : text.split("\n")) {
++            if (line.contains("Welcome back, Nobita.")) welcome = line;
++            if (line.contains("Your terminal. Your rules.")) rules = line;
++        }
++        if (welcome == null || rules == null) return;
++        // 7 lines -> 3 lines (~57% smaller): one restrained cyan wordmark
++        // plus the two original greeting lines, byte-for-byte.
++        String compact = "\033[1;38;5;51mNOBITA\033[0m\n" + welcome + "\n" + rules + "\n";
++        File tmp = new File(motd.getParentFile(), "motd.nobi-tmp");
++        try (FileOutputStream out = new FileOutputStream(tmp)) {
++            out.write(compact.getBytes(StandardCharsets.UTF_8));
++        }
++        if (!tmp.renameTo(motd)) tmp.delete();
++    }
++
++    private static byte[] readAll(File file) throws Exception {
++        try (FileInputStream in = new FileInputStream(file)) {
++            byte[] buf = new byte[(int) file.length()];
++            int off = 0;
++            int n;
++            while (off < buf.length && (n = in.read(buf, off, buf.length - off)) > 0) off += n;
++            if (off < buf.length) {
++                byte[] shortBuf = new byte[off];
++                System.arraycopy(buf, 0, shortBuf, 0, off);
++                return shortBuf;
++            }
++            return buf;
++        }
++    }
++
++}
+diff --git a/termux-app/terminal-view/src/main/java/com/termux/view/TerminalView.java b/termux-app/terminal-view/src/main/java/com/termux/view/TerminalView.java
+--- a/termux-app/terminal-view/src/main/java/com/termux/view/TerminalView.java
++++ b/termux-app/terminal-view/src/main/java/com/termux/view/TerminalView.java
+@@ -1035,7 +1035,10 @@
+     @Override
+     protected void onDraw(Canvas canvas) {
+         if (mEmulator == null) {
+-            canvas.drawColor(0XFF000000);
++            // v24 w48: no-emulator fallback = design-system terminal bg
++            // (#080D1C) instead of pure black, so a session switch never
++            // flashes a black frame.
++            canvas.drawColor(0XFF080D1C);
+         } else {
+             // render the terminal view and highlight any selected text
+             int[] sel = mDefaultSelectors;

@@ -1,0 +1,221 @@
+diff --git a/termux-app/app/src/main/res/xml/root_preferences.xml b/termux-app/app/src/main/res/xml/root_preferences.xml
+--- a/termux-app/app/src/main/res/xml/root_preferences.xml
++++ b/termux-app/app/src/main/res/xml/root_preferences.xml
+@@ -1,11 +1,12 @@
+ <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+-    <Preference
+-        app:icon="@drawable/nobi_pref_gear"
+-        app:key="termux"
+-        app:title="@string/termux_preferences_title"
+-        app:summary="@string/termux_preferences_summary"
+-        app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
++    <!-- v24 w51: settings regrouped into the spec Phase 5 groups
++         (GENERAL / TERMINAL / KEYBOARD / ADVANCED). Presentational only:
++         every row keeps its original key, default, icon, fragment and
++         summary — nothing is renamed, removed or re-defaulted. There is
++         no SESSIONS group: no root-level session setting exists in this
++         build, and no fake setting is invented to fill one. The hidden
++         plugin rows stay top-level and invisible, exactly as before. -->
+ 
+     <Preference
+         app:icon="@drawable/nobi_pref_server"
+@@ -39,23 +40,71 @@
+         app:isPreferenceVisible="false"
+         app:fragment="com.termux.app.fragments.settings.TermuxWidgetPreferencesFragment"/>
+ 
+-    <Preference
+-        app:icon="@drawable/nobi_pref_info"
+-        app:key="about"
+-        app:title="@string/about_preference_title"
+-        app:persistent="false"/>
+-    <!-- app:layout="@layout/preference_markdown_text" -->
++    <PreferenceCategory
++        app:key="nobi_group_terminal"
++        app:title="@string/nobi_settings_group_terminal">
+ 
+-    <Preference
+-        app:icon="@drawable/nobi_pref_share"
+-        app:key="donate"
+-        app:title="@string/donate_preference_title"
+-        app:persistent="false"
+-        app:isPreferenceVisible="false"/>
++        <Preference
++            app:icon="@drawable/nobi_pref_gear"
++            app:key="termux"
++            app:title="@string/termux_preferences_title"
++            app:summary="@string/termux_preferences_summary"
++            app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
++
++    </PreferenceCategory>
++
++    <PreferenceCategory
++        app:key="nobi_group_general"
++        app:title="@string/nobi_settings_group_general">
++
++        <Preference
++            app:icon="@drawable/nobi_pref_theme"
++            app:key="nobi_theme"
++            app:title="@string/nobi_theme_preference_title"
++            app:summary="@string/nobi_theme_preference_summary"
++            app:fragment="com.termux.app.fragments.settings.nobi.ThemePreferencesFragment"/>
++
++        <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_list"
++            app:key="nobi_startup_picker"
++            app:title="@string/nobi_startup_picker_preference_title"
++            app:summary="@string/nobi_startup_picker_preference_summary"
++            app:defaultValue="true"/>
++
++        <CheckBoxPreference
++            app:icon="@drawable/nobi_pref_play"
++            app:key="nobi_animated_intro"
++            app:title="@string/nobi_animated_intro_preference_title"
++            app:summary="@string/nobi_animated_intro_preference_summary"
++            app:defaultValue="true"/>
++
++        <ListPreference
++            app:icon="@drawable/nobi_pref_terminal"
++            app:key="nobi_launcher_icon"
++            app:title="@string/nobi_launcher_icon_preference_title"
++            app:summary="@string/nobi_launcher_icon_preference_summary"
++            app:entries="@array/nobi_launcher_icon_entries"
++            app:entryValues="@array/nobi_launcher_icon_values"
++            app:defaultValue="default"/>
++
++    </PreferenceCategory>
+ 
+     <PreferenceCategory
+-        app:key="nobi_terminal"
+-        app:title="@string/nobi_settings_category_title">
++        app:key="nobi_group_keyboard"
++        app:title="@string/nobi_settings_group_keyboard">
++
++        <Preference
++            app:icon="@drawable/nobi_pref_keyboard"
++            app:key="nobi_extra_keys"
++            app:title="@string/nobi_extra_keys_preference_title"
++            app:summary="@string/nobi_extra_keys_preference_summary"
++            app:fragment="com.termux.app.fragments.settings.nobi.ExtraKeysPreferencesFragment"/>
++
++    </PreferenceCategory>
++
++    <PreferenceCategory
++        app:key="nobi_group_advanced"
++        app:title="@string/nobi_settings_group_advanced">
+ 
+         <Preference
+             app:icon="@drawable/nobi_pref_copy"
+@@ -78,20 +127,6 @@
+             app:summary="@string/nobi_dev_setup_preference_summary"
+             app:persistent="false"/>
+ 
+-        <Preference
+-            app:icon="@drawable/nobi_pref_theme"
+-            app:key="nobi_theme"
+-            app:title="@string/nobi_theme_preference_title"
+-            app:summary="@string/nobi_theme_preference_summary"
+-            app:fragment="com.termux.app.fragments.settings.nobi.ThemePreferencesFragment"/>
+-
+-        <Preference
+-            app:icon="@drawable/nobi_pref_keyboard"
+-            app:key="nobi_extra_keys"
+-            app:title="@string/nobi_extra_keys_preference_title"
+-            app:summary="@string/nobi_extra_keys_preference_summary"
+-            app:fragment="com.termux.app.fragments.settings.nobi.ExtraKeysPreferencesFragment"/>
+-
+         <CheckBoxPreference
+             app:icon="@drawable/nobi_pref_power"
+             app:key="nobi_wake_lock"
+@@ -106,29 +141,20 @@
+             app:summary="@string/nobi_app_lock_preference_summary"
+             app:persistent="false"/>
+ 
+-        <CheckBoxPreference
+-            app:icon="@drawable/nobi_pref_list"
+-            app:key="nobi_startup_picker"
+-            app:title="@string/nobi_startup_picker_preference_title"
+-            app:summary="@string/nobi_startup_picker_preference_summary"
+-            app:defaultValue="true"/>
+-
+-        <CheckBoxPreference
+-            app:icon="@drawable/nobi_pref_play"
+-            app:key="nobi_animated_intro"
+-            app:title="@string/nobi_animated_intro_preference_title"
+-            app:summary="@string/nobi_animated_intro_preference_summary"
+-            app:defaultValue="true"/>
++    </PreferenceCategory>
+ 
+-        <ListPreference
+-            app:icon="@drawable/nobi_pref_terminal"
+-            app:key="nobi_launcher_icon"
+-            app:title="@string/nobi_launcher_icon_preference_title"
+-            app:summary="@string/nobi_launcher_icon_preference_summary"
+-            app:entries="@array/nobi_launcher_icon_entries"
+-            app:entryValues="@array/nobi_launcher_icon_values"
+-            app:defaultValue="default"/>
++    <Preference
++        app:icon="@drawable/nobi_pref_info"
++        app:key="about"
++        app:title="@string/about_preference_title"
++        app:persistent="false"/>
++    <!-- app:layout="@layout/preference_markdown_text" -->
+ 
+-    </PreferenceCategory>
++    <Preference
++        app:icon="@drawable/nobi_pref_share"
++        app:key="donate"
++        app:title="@string/donate_preference_title"
++        app:persistent="false"
++        app:isPreferenceVisible="false"/>
+ 
+ </PreferenceScreen>
+diff --git a/termux-app/app/src/main/res/values/strings.xml b/termux-app/app/src/main/res/values/strings.xml
+--- a/termux-app/app/src/main/res/values/strings.xml
++++ b/termux-app/app/src/main/res/values/strings.xml
+@@ -246,6 +246,11 @@
+ 
+     <!-- NobiTerminal Preferences -->
+     <string name="nobi_settings_category_title">NobiTerminal</string>
++    <!-- v24 w51: Phase 5 settings group titles. -->
++    <string name="nobi_settings_group_general">General</string>
++    <string name="nobi_settings_group_terminal">Terminal</string>
++    <string name="nobi_settings_group_keyboard">Keyboard</string>
++    <string name="nobi_settings_group_advanced">Advanced</string>
+ 
+     <string name="nobi_backup_preference_title">Backup My Setup</string>
+     <string name="nobi_backup_preference_summary">Save your installed packages list and settings to a backup file</string>
+diff --git a/termux-app/termux-shared/src/main/res/values/themes.xml b/termux-app/termux-shared/src/main/res/values/themes.xml
+--- a/termux-app/termux-shared/src/main/res/values/themes.xml
++++ b/termux-app/termux-shared/src/main/res/values/themes.xml
+@@ -72,6 +72,9 @@
+       https://github.com/material-components/material-components-android/blob/1.4.0/lib/java/com/google/android/material/dialog/res/values/themes.xml#L70
+      -->
+     <style name="ThemeOverlay.BaseDialog.Light" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
++        <!-- v24 w51: M3 dialog corner radius (spec 5, 20dp shape). -->
++        <item name="dialogCornerRadius">20dp</item>
++
+         <!-- Primary brand color. -->
+         <item name="colorPrimary">@color/nobi_navy</item>
+         <item name="colorPrimaryVariant">@color/nobi_navy</item>
+diff --git a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+--- a/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
++++ b/termux-app/app/src/main/java/com/termux/app/TermuxActivity.java
+@@ -1044,7 +1044,7 @@
+         String message = serverRunning
+             ? getString(R.string.nobi_exit_server_warning)
+             : getString(R.string.nobi_exit_message);
+-        new AlertDialog.Builder(this)
++        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+             .setTitle(R.string.nobi_exit_title)
+             .setMessage(message)
+             .setView(saveBox)
+@@ -2738,7 +2738,7 @@
+             | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+         int pad = (int) (16 * getResources().getDisplayMetrics().density);
+         input.setPadding(pad, pad, pad, pad);
+-        new AlertDialog.Builder(this)
++        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+             .setTitle(R.string.nobi_app_locked_title)
+             .setMessage(R.string.nobi_app_locked_message)
+             .setView(input)
