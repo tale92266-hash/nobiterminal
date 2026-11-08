@@ -1,0 +1,29 @@
+diff --git a/termux-app/app/src/main/res/values-night/themes.xml b/termux-app/app/src/main/res/values-night/themes.xml
+--- a/termux-app/app/src/main/res/values-night/themes.xml
++++ b/termux-app/app/src/main/res/values-night/themes.xml
+@@ -15,7 +15,7 @@
+         <item name="colorSecondary">@color/nobi_cyan</item>
+         <item name="colorControlActivated">@color/nobi_cyan</item>
+ 
+-        <item name="android:windowBackground">@color/black</item>
++        <item name="android:windowBackground">@color/nobi_ds_terminal_bg</item>
+ 
+         <!-- Avoid action mode toolbar pushing down terminal content when
+              selecting text on pre-6.0 (non-floating toolbar). -->
+@@ -34,10 +34,12 @@
+         <item name="termuxActivityDrawerImageTint">@color/white</item>
+ 
+         <!-- Extra keys colors. -->
+-        <item name="extraKeysButtonTextColor">@color/white</item>
+-        <item name="extraKeysButtonActiveTextColor">@color/nobi_cyan</item>
+-        <item name="extraKeysButtonBackgroundColor">@color/nobi_navy</item>
+-        <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_key_pressed</item>
++        <!-- v24 w54: night twin of the w47 ds-token block (day file). -->
++        <item name="extraKeysButtonTextColor">@color/nobi_ds_text_primary</item>
++        <item name="extraKeysButtonActiveTextColor">@color/nobi_ds_accent</item>
++        <item name="extraKeysButtonBackgroundColor">@color/nobi_ds_elevated</item>
++        <item name="extraKeysButtonActiveBackgroundColor">@color/nobi_ds_selected</item>
++        <item name="extraKeysButtonOutlineColor">@color/nobi_ds_outline</item>
+     </style>
+ 
+     <!-- v21 w31: night twin of Theme.NobiSettings.DayNight. A style defined in
